@@ -1,0 +1,37 @@
+{
+  "name": "gourmet-ebt",
+  "version": "1.0.0",
+  "description": "Gourmet ghost restaurant experience for EBT customers - grocery delivery with chef-prepared meals",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "server": "node server/index.js",
+    "dev": "concurrently \"npm run server\" \"npm start\""
+  },
+  "dependencies": {
+    "expo": "~52.0.0",
+    "@expo/vector-icons": "^14.0.0",
+    "expo-status-bar": "~2.0.0",
+    "expo-linear-gradient": "~14.0.0",
+    "expo-location": "~18.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.6",
+    "react-native-safe-area-context": "4.14.0",
+    "react-native-screens": "~4.4.0",
+    "@react-navigation/native": "^7.0.0",
+    "@react-navigation/bottom-tabs": "^7.0.0",
+    "@react-navigation/native-stack": "^7.0.0",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-reanimated": "~3.16.0",
+    "react-native-maps": "1.18.0",
+    "zustand": "^5.0.0",
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0"
+  },
+  "private": true
+}
