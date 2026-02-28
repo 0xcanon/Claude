@@ -20,33 +20,36 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ChefDashboardScreen from '../screens/ChefDashboardScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const HomeStackNav = createNativeStackNavigator();
+const OrdersStackNav = createNativeStackNavigator();
+const ProfileStackNav = createNativeStackNavigator();
+const RootStack = createNativeStackNavigator();
 
 function HomeStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="KitchenDetail" component={KitchenDetailScreen} />
-      <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
-    </Stack.Navigator>
+    <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStackNav.Screen name="Home" component={HomeScreen} />
+      <HomeStackNav.Screen name="KitchenDetail" component={KitchenDetailScreen} />
+      <HomeStackNav.Screen name="ItemDetail" component={ItemDetailScreen} />
+    </HomeStackNav.Navigator>
   );
 }
 
 function OrdersStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="OrdersList" component={OrdersScreen} />
-      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
-    </Stack.Navigator>
+    <OrdersStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <OrdersStackNav.Screen name="OrdersList" component={OrdersScreen} />
+      <OrdersStackNav.Screen name="OrderTracking" component={OrderTrackingScreen} />
+    </OrdersStackNav.Navigator>
   );
 }
 
 function ProfileStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="ProfileMain" component={ProfileScreen} />
-      <Stack.Screen name="ChefDashboard" component={ChefDashboardScreen} />
-    </Stack.Navigator>
+    <ProfileStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <ProfileStackNav.Screen name="ProfileMain" component={ProfileScreen} />
+      <ProfileStackNav.Screen name="ChefDashboard" component={ChefDashboardScreen} />
+    </ProfileStackNav.Navigator>
   );
 }
 
@@ -129,15 +132,15 @@ function TabNavigator() {
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="MainTabs" component={TabNavigator} />
-        <Stack.Screen name="Checkout" component={CheckoutScreen} />
-        <Stack.Screen
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        <RootStack.Screen name="MainTabs" component={TabNavigator} />
+        <RootStack.Screen name="Checkout" component={CheckoutScreen} />
+        <RootStack.Screen
           name="OrderConfirmation"
           component={OrderConfirmationScreen}
           options={{ gestureEnabled: false }}
         />
-      </Stack.Navigator>
+      </RootStack.Navigator>
     </NavigationContainer>
   );
 }

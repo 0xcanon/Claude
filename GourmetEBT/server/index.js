@@ -5,6 +5,16 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Disable x-powered-by header to reduce fingerprinting
+app.disable('x-powered-by');
+
+// ============================================================
+// Constants
+// ============================================================
+const MAX_ITEMS_PER_ORDER = 50;
+const MAX_ORDERS = 10000;
+const MAX_EBT_CARDS = 5000;
+
 // ============================================================
 // Middleware
 // ============================================================
@@ -15,9 +25,19 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors(allowedOrigins ? { origin: allowedOrigins } : undefined));
 app.use(express.json({ limit: '50kb' }));
 
-// Simple request logger
+// Security headers
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Simple request logger (sanitized path)
+app.use((req, res, next) => {
+  const safePath = req.path.replace(/[^\w/\-.:]/g, '_').slice(0, 200);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${safePath}`);
   next();
 });
 
@@ -54,7 +74,29 @@ function sanitizeString(str, maxLength = 500) {
 }
 
 function isValidAmount(amount) {
-  return typeof amount === 'number' && !isNaN(amount) && amount > 0 && amount < 100000;
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 && amount < 100000;
+}
+
+function roundMoney(amount) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return 0;
+  return Math.round(amount * 100) / 100;
+}
+
+function sanitizeItem(item) {
+  const ALLOWED_ITEM_FIELDS = ['id', 'name', 'price', 'quantity', 'groceryCost', 'ebtEligible', 'ingredients', 'description'];
+  const sanitized = {};
+  for (const key of ALLOWED_ITEM_FIELDS) {
+    if (key in item) {
+      if (key === 'name' || key === 'description') {
+        sanitized[key] = sanitizeString(item[key], 200);
+      } else if (key === 'ingredients' && Array.isArray(item[key])) {
+        sanitized[key] = item[key].slice(0, 30).map((ing) => sanitizeString(String(ing), 100));
+      } else {
+        sanitized[key] = item[key];
+      }
+    }
+  }
+  return sanitized;
 }
 
 function isValidCardNumber(cardNumber) {
@@ -81,6 +123,9 @@ app.post('/api/ebt/link', (req, res) => {
     return res.status(400).json({ success: false, error: 'Card number and PIN are required' });
   }
 
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'User ID is required' });
+  }
   if (!isValidCardNumber(cardNumber)) {
     return res.status(400).json({ success: false, error: 'Invalid EBT card number (must be 16-19 digits)' });
   }
@@ -88,8 +133,13 @@ app.post('/api/ebt/link', (req, res) => {
     return res.status(400).json({ success: false, error: 'PIN must be exactly 4 digits' });
   }
 
+  // Memory limit check
+  if (ebtCards.size >= MAX_EBT_CARDS) {
+    return res.status(503).json({ success: false, error: 'Service temporarily at capacity' });
+  }
+
   const cleaned = cardNumber.replace(/\D/g, '');
-  const userKey = sanitizeString(userId) || 'default';
+  const userKey = sanitizeString(userId);
 
   // In production, this would call an EBT payment processor API
   // (e.g., Forage, Soda, or direct USDA FNS integration)
@@ -113,7 +163,7 @@ app.post('/api/ebt/link', (req, res) => {
 
 // Check EBT balance
 app.get('/api/ebt/balance/:userId', (req, res) => {
-  const card = ebtCards.get(req.params.userId) || ebtCards.get('default');
+  const card = ebtCards.get(sanitizeString(req.params.userId));
   if (!card) {
     return res.status(404).json({ success: false, error: 'No EBT card linked' });
   }
@@ -139,7 +189,17 @@ app.post('/api/ebt/charge', (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid charge amount (must be a positive number)' });
   }
 
-  const userKey = sanitizeString(userId) || 'default';
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'User ID is required' });
+  }
+
+  // Verify order exists
+  const order = orders.get(orderId);
+  if (!order) {
+    return res.status(404).json({ success: false, error: 'Order not found' });
+  }
+
+  const userKey = sanitizeString(userId);
   const card = ebtCards.get(userKey);
   if (!card) {
     return res.status(404).json({ success: false, error: 'No EBT card linked' });
@@ -156,13 +216,14 @@ app.post('/api/ebt/charge', (req, res) => {
 
   // In production: call EBT processor to authorize and capture payment
   // EBT-eligible items must be SNAP-approved food items
-  card.balance -= amount;
+  card.balance = roundMoney(card.balance - amount);
+  card.balance = Math.max(0, card.balance);
   processedCharges.add(orderId);
 
   res.json({
     success: true,
     transactionId: `EBT-${uuidv4().slice(0, 8).toUpperCase()}`,
-    amountCharged: amount,
+    amountCharged: roundMoney(amount),
     remainingBalance: card.balance,
     message: 'EBT payment processed successfully',
   });
@@ -180,20 +241,28 @@ app.post('/api/orders', (req, res) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, error: 'Order must have at least one item' });
   }
+  if (items.length > MAX_ITEMS_PER_ORDER) {
+    return res.status(400).json({ success: false, error: `Order cannot exceed ${MAX_ITEMS_PER_ORDER} items` });
+  }
 
   // Validate each item has required fields
   for (const item of items) {
-    if (!item.name || typeof item.price !== 'number' || item.price <= 0) {
+    if (!item.name || typeof item.price !== 'number' || !Number.isFinite(item.price) || item.price <= 0) {
       return res.status(400).json({ success: false, error: 'Each item must have a name and valid price' });
     }
-    if (!item.quantity || item.quantity < 1 || item.quantity > 50) {
-      return res.status(400).json({ success: false, error: 'Item quantity must be between 1 and 50' });
+    if (!item.quantity || item.quantity < 1 || item.quantity > 99) {
+      return res.status(400).json({ success: false, error: 'Item quantity must be between 1 and 99' });
     }
   }
 
-  // Validate kitchen
-  if (kitchenId && !VALID_KITCHEN_IDS.includes(kitchenId)) {
-    return res.status(400).json({ success: false, error: 'Invalid kitchen ID' });
+  // Validate kitchen (required)
+  if (!kitchenId || !VALID_KITCHEN_IDS.includes(kitchenId)) {
+    return res.status(400).json({ success: false, error: 'Valid kitchen ID is required' });
+  }
+
+  // Memory limit check
+  if (orders.size >= MAX_ORDERS) {
+    return res.status(503).json({ success: false, error: 'Service temporarily at capacity' });
   }
 
   // Validate payment method
@@ -202,17 +271,20 @@ app.post('/api/orders', (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid payment method' });
   }
 
-  const total = items.reduce((t, item) => t + item.price * item.quantity, 0);
-  const groceryCost = items.reduce((t, item) => t + (item.groceryCost || 0) * item.quantity, 0);
+  // Sanitize items through allowlist
+  const sanitizedItems = items.map(sanitizeItem);
+
+  const total = roundMoney(sanitizedItems.reduce((t, item) => t + roundMoney(item.price * item.quantity), 0));
+  const groceryCost = roundMoney(sanitizedItems.reduce((t, item) => t + roundMoney((item.groceryCost || 0) * item.quantity), 0));
 
   const order = {
-    id: `ORD-${Date.now()}`,
+    id: `ORD-${uuidv4().slice(0, 12).toUpperCase()}`,
     userId: sanitizeString(userId) || 'guest',
-    items,
+    items: sanitizedItems,
     kitchenId,
     total,
     groceryCost,
-    chefFee: total - groceryCost,
+    chefFee: roundMoney(total - groceryCost),
     paymentMethod,
     status: 'confirmed',
     statusHistory: [
@@ -231,7 +303,7 @@ app.post('/api/orders', (req, res) => {
   orders.set(order.id, order);
 
   // Create a corresponding kitchen order with grocery shopping list
-  const groceryList = items.flatMap((item) =>
+  const groceryList = sanitizedItems.flatMap((item) =>
     (item.ingredients || []).map((ing) => ({
       name: sanitizeString(ing, 100),
       checked: false,
@@ -294,6 +366,15 @@ app.patch('/api/orders/:orderId/status', (req, res) => {
       success: false,
       error: `Cannot transition from "${order.status}" to "${status}". Allowed: ${allowedNextStatuses.join(', ') || 'none'}`,
     });
+  }
+
+  // Refund EBT balance on cancellation
+  if (status === 'cancelled' && order.paymentMethod === 'ebt' && order.groceryCost > 0) {
+    const card = ebtCards.get(order.userId);
+    if (card) {
+      card.balance = roundMoney(card.balance + order.groceryCost);
+      processedCharges.delete(order.id);
+    }
   }
 
   order.status = status;
@@ -390,7 +471,8 @@ app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({ success: false, error: 'Invalid JSON in request body' });
   }
-  console.error(`[ERROR] ${err.message}`);
+  const safeMessage = String(err.message || 'Unknown error').slice(0, 500);
+  console.error(`[ERROR] ${safeMessage}`);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 

@@ -21,6 +21,13 @@ export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const { favorites, toggleFavorite, activeOrder, user } = useStore();
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   const filteredKitchens = ghostKitchens.filter((kitchen) => {
     const matchesCategory =
       selectedCategory === 'all' ||
@@ -41,7 +48,7 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good evening</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
             <View style={styles.locationRow}>
               <MaterialIcons name="location-on" size={16} color={colors.primary} />
               <Text style={styles.location} numberOfLines={1}>

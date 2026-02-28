@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,13 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, sizes, weights } from '../theme';
 import { useStore } from '../store/useStore';
-import { formatPrice, validateEbtCard, maskCardNumber } from '../utils/helpers';
+import { formatPrice, validateEbtCard, roundMoney } from '../utils/helpers';
 
 export default function CheckoutScreen({ route, navigation }) {
-  const { total } = route.params;
+  const { total } = route.params || {};
   const {
     user,
+    setUser,
     ebtCardLinked,
     ebtBalance,
     ebtCardLast4,
@@ -26,6 +27,16 @@ export default function CheckoutScreen({ route, navigation }) {
     placeOrder,
     getCartTotal,
   } = useStore();
+
+  const isMountedRef = useRef(true);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const subtotal = getCartTotal();
   const serviceFee = 2.99;
@@ -39,7 +50,7 @@ export default function CheckoutScreen({ route, navigation }) {
   const [tipAmount, setTipAmount] = useState(0);
 
   const tipOptions = [0, 2, 5, 8];
-  const finalTotal = total + tipAmount;
+  const finalTotal = roundMoney(subtotal + serviceFee + tipAmount);
 
   const handleLinkCard = () => {
     if (!validateEbtCard(ebtCardNumber)) {
@@ -51,7 +62,8 @@ export default function CheckoutScreen({ route, navigation }) {
       return;
     }
     // Mock linking - in production this would hit an EBT processor API
-    const last4 = ebtCardNumber.slice(-4);
+    const cleaned = ebtCardNumber.replace(/\D/g, '');
+    const last4 = cleaned.slice(-4);
     const mockBalance = 487.50; // Mock balance
     linkEbtCard(last4, mockBalance);
     setShowLinkCard(false);
@@ -60,8 +72,14 @@ export default function CheckoutScreen({ route, navigation }) {
   };
 
   const handlePlaceOrder = () => {
+    if (isProcessing) return; // Double-tap guard
+
     if (!paymentMethod) {
       Alert.alert('Payment Required', 'Please select a payment method.');
+      return;
+    }
+    if (!address || address.trim().length === 0) {
+      Alert.alert('Address Required', 'Please enter a delivery address.');
       return;
     }
     if (paymentMethod === 'ebt' && ebtBalance < finalTotal) {
@@ -71,9 +89,15 @@ export default function CheckoutScreen({ route, navigation }) {
 
     setIsProcessing(true);
 
-    // Simulate processing
-    setTimeout(() => {
-      placeOrder(paymentMethod);
+    // Persist address to store before placing order
+    if (address !== user.address) {
+      setUser({ address });
+    }
+
+    // Simulate processing with cleanup
+    timerRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
+      placeOrder(paymentMethod, serviceFee, tipAmount);
       setIsProcessing(false);
       navigation.reset({
         index: 0,

@@ -51,7 +51,8 @@ export default function ProfileScreen({ navigation }) {
       Alert.alert('Invalid PIN', 'Please enter your 4-digit PIN.');
       return;
     }
-    const last4 = cardNumber.slice(-4);
+    const cleaned = cardNumber.replace(/\D/g, '');
+    const last4 = cleaned.slice(-4);
     linkEbtCard(last4, 487.50);
     setShowLinkEbt(false);
     setCardNumber('');

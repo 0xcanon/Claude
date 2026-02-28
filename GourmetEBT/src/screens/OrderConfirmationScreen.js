@@ -17,7 +17,11 @@ export default function OrderConfirmationScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.sequence([
+    if (!activeOrder) {
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      return;
+    }
+    const animation = Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 1,
         tension: 50,
@@ -29,11 +33,12 @@ export default function OrderConfirmationScreen({ navigation }) {
         duration: 400,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, []);
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [activeOrder]);
 
   if (!activeOrder) {
-    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     return null;
   }
 

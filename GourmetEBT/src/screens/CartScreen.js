@@ -14,7 +14,7 @@ import { ghostKitchens } from '../data/stores';
 import { formatPrice } from '../utils/helpers';
 
 export default function CartScreen({ navigation }) {
-  const { cart, cartKitchenId, updateQuantity, removeFromCart, clearCart, getCartTotal } = useStore();
+  const { cart, cartKitchenId, updateQuantity, clearCart, getCartTotal } = useStore();
 
   const cartTotal = getCartTotal();
   const serviceFee = cartTotal > 0 ? 2.99 : 0;

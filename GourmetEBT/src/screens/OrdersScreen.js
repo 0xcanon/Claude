@@ -75,14 +75,14 @@ export default function OrdersScreen({ navigation }) {
 
               {/* Progress Bar */}
               <View style={styles.progressContainer}>
-                {['confirmed', 'shopping', 'cooking', 'delivering', 'delivered'].map((step, index) => {
-                  const stepOrder = ['confirmed', 'shopping', 'cooking', 'delivering', 'delivered'];
-                  const currentIndex = stepOrder.indexOf(activeOrder.status);
+                {['confirmed', 'shopping', 'preparing', 'cooking', 'ready', 'delivering', 'delivered'].map((step, index, arr) => {
+                  const fullFlow = ['confirmed', 'shopping', 'preparing', 'cooking', 'ready', 'delivering', 'delivered'];
+                  const currentIndex = fullFlow.indexOf(activeOrder.status);
                   const isActive = index <= currentIndex;
                   return (
                     <View key={step} style={styles.progressStep}>
                       <View style={[styles.progressDot, isActive && styles.progressDotActive]} />
-                      {index < 4 && (
+                      {index < arr.length - 1 && (
                         <View style={[styles.progressLine, isActive && styles.progressLineActive]} />
                       )}
                     </View>
@@ -90,10 +90,12 @@ export default function OrdersScreen({ navigation }) {
                 })}
               </View>
               <View style={styles.progressLabels}>
-                <Text style={styles.progressLabel}>Confirmed</Text>
-                <Text style={styles.progressLabel}>Shopping</Text>
-                <Text style={styles.progressLabel}>Cooking</Text>
-                <Text style={styles.progressLabel}>Delivering</Text>
+                <Text style={styles.progressLabel}>Order</Text>
+                <Text style={styles.progressLabel}>Shop</Text>
+                <Text style={styles.progressLabel}>Prep</Text>
+                <Text style={styles.progressLabel}>Cook</Text>
+                <Text style={styles.progressLabel}>Ready</Text>
+                <Text style={styles.progressLabel}>Transit</Text>
                 <Text style={styles.progressLabel}>Done</Text>
               </View>
 

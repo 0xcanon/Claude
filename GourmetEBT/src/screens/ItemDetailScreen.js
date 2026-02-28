@@ -186,7 +186,7 @@ export default function ItemDetailScreen({ route, navigation }) {
           <Text style={styles.qtyText}>{quantity}</Text>
           <TouchableOpacity
             style={styles.qtyButton}
-            onPress={() => setQuantity(quantity + 1)}
+            onPress={() => setQuantity(Math.min(99, quantity + 1))}
           >
             <MaterialIcons name="add" size={20} color={colors.primary} />
           </TouchableOpacity>

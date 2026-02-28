@@ -12,7 +12,7 @@ import { colors, spacing, borderRadius, sizes, weights } from '../theme';
 import { useStore } from '../store/useStore';
 import { formatPrice, getTimeAgo, getOrderStatusColor } from '../utils/helpers';
 
-const STATUS_FLOW = ['shopping', 'preparing', 'cooking', 'ready', 'delivering', 'delivered'];
+const STATUS_FLOW = ['confirmed', 'shopping', 'preparing', 'cooking', 'ready', 'delivering', 'delivered'];
 
 export default function ChefDashboardScreen({ navigation }) {
   const { kitchenOrders, updateKitchenOrderStatus } = useStore();

@@ -1,16 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, sizes, weights } from '../theme';
-
-const kitchenImages = {
-  soul_kitchen: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400',
-  cocina: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400',
-  golden_plate: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400',
-  wok_fire: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400',
-  garden_gourmet: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400',
-  italian_kitchen: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=400',
-};
 
 export default function KitchenCard({ kitchen, onPress, isFavorite, onToggleFavorite }) {
   return (

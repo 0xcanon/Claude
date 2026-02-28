@@ -6,7 +6,9 @@ import { useStore } from '../store/useStore';
 import { formatPrice } from '../utils/helpers';
 
 export default function EbtBanner({ onLinkCard }) {
-  const { ebtCardLinked, ebtBalance, ebtCardLast4 } = useStore();
+  const ebtCardLinked = useStore((s) => s.ebtCardLinked);
+  const ebtBalance = useStore((s) => s.ebtBalance);
+  const ebtCardLast4 = useStore((s) => s.ebtCardLast4);
 
   if (!ebtCardLinked) {
     return (
