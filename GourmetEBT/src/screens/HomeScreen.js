@@ -52,7 +52,7 @@ export default function HomeScreen({ navigation }) {
           </View>
           <TouchableOpacity
             style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}
+            onPress={() => navigation.navigate('ProfileTab')}
           >
             <MaterialIcons name="person" size={24} color={colors.primary} />
           </TouchableOpacity>
@@ -80,14 +80,14 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.section}>
             <OrderStatusBar
               order={activeOrder}
-              onPress={() => navigation.navigate('Orders')}
+              onPress={() => navigation.navigate('OrdersTab')}
             />
           </View>
         )}
 
         {/* EBT Banner */}
         <View style={styles.section}>
-          <EbtBanner onLinkCard={() => navigation.navigate('Profile')} />
+          <EbtBanner onLinkCard={() => navigation.navigate('ProfileTab')} />
         </View>
 
         {/* Hero Banner */}

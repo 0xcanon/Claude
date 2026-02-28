@@ -24,8 +24,11 @@ export default function CheckoutScreen({ route, navigation }) {
     linkEbtCard,
     cart,
     placeOrder,
+    getCartTotal,
   } = useStore();
 
+  const subtotal = getCartTotal();
+  const serviceFee = 2.99;
   const [paymentMethod, setPaymentMethod] = useState(ebtCardLinked ? 'ebt' : null);
   const [ebtCardNumber, setEbtCardNumber] = useState('');
   const [ebtPin, setEbtPin] = useState('');
@@ -252,11 +255,11 @@ export default function CheckoutScreen({ route, navigation }) {
             <View style={styles.divider} />
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>{formatPrice(total - 2.99)}</Text>
+              <Text style={styles.summaryValue}>{formatPrice(subtotal)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Service Fee</Text>
-              <Text style={styles.summaryValue}>{formatPrice(2.99)}</Text>
+              <Text style={styles.summaryValue}>{formatPrice(serviceFee)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Delivery</Text>

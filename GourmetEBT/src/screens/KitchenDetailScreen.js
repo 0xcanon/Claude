@@ -179,7 +179,7 @@ export default function KitchenDetailScreen({ route, navigation }) {
         <View style={styles.cartBar}>
           <TouchableOpacity
             style={styles.cartButton}
-            onPress={() => navigation.navigate('Cart')}
+            onPress={() => navigation.navigate('CartTab')}
           >
             <View style={styles.cartLeft}>
               <View style={styles.cartBadge}>

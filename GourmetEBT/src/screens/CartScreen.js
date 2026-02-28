@@ -18,7 +18,7 @@ export default function CartScreen({ navigation }) {
 
   const cartTotal = getCartTotal();
   const serviceFee = cartTotal > 0 ? 2.99 : 0;
-  const tax = cartTotal * 0; // No tax on EBT-eligible grocery items
+  const tax = 0; // No tax on EBT-eligible grocery items
   const total = cartTotal + serviceFee + tax;
 
   const kitchen = ghostKitchens.find((k) => k.id === cartKitchenId);

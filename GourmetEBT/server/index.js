@@ -5,8 +5,21 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+// ============================================================
+// Middleware
+// ============================================================
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : undefined; // undefined = allow all in dev
+
+app.use(cors(allowedOrigins ? { origin: allowedOrigins } : undefined));
+app.use(express.json({ limit: '50kb' }));
+
+// Simple request logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
 
 // ============================================================
 // In-memory data store (replace with database in production)
@@ -15,6 +28,46 @@ const users = new Map();
 const orders = new Map();
 const kitchenOrders = new Map();
 const ebtCards = new Map();
+const processedCharges = new Set(); // Track charged orderIds for idempotency
+
+// Valid kitchen IDs
+const VALID_KITCHEN_IDS = ['gk-1', 'gk-2', 'gk-3', 'gk-4', 'gk-5', 'gk-6'];
+
+// Valid status transitions (state machine)
+const VALID_TRANSITIONS = {
+  confirmed: ['shopping', 'cancelled'],
+  shopping: ['preparing', 'cancelled'],
+  preparing: ['cooking', 'cancelled'],
+  cooking: ['ready', 'cancelled'],
+  ready: ['delivering', 'cancelled'],
+  delivering: ['delivered'],
+  delivered: [],
+  cancelled: [],
+};
+
+// ============================================================
+// Input validation helpers
+// ============================================================
+function sanitizeString(str, maxLength = 500) {
+  if (typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLength);
+}
+
+function isValidAmount(amount) {
+  return typeof amount === 'number' && !isNaN(amount) && amount > 0 && amount < 100000;
+}
+
+function isValidCardNumber(cardNumber) {
+  if (typeof cardNumber !== 'string') return false;
+  const cleaned = cardNumber.replace(/\D/g, '');
+  return cleaned.length >= 16 && cleaned.length <= 19;
+}
+
+function isValidPin(pin) {
+  if (typeof pin !== 'string') return false;
+  const cleaned = pin.replace(/\D/g, '');
+  return cleaned.length === 4;
+}
 
 // ============================================================
 // EBT Payment Routes
@@ -25,25 +78,28 @@ app.post('/api/ebt/link', (req, res) => {
   const { userId, cardNumber, pin } = req.body;
 
   if (!cardNumber || !pin) {
-    return res.status(400).json({ error: 'Card number and PIN are required' });
+    return res.status(400).json({ success: false, error: 'Card number and PIN are required' });
+  }
+
+  if (!isValidCardNumber(cardNumber)) {
+    return res.status(400).json({ success: false, error: 'Invalid EBT card number (must be 16-19 digits)' });
+  }
+  if (!isValidPin(pin)) {
+    return res.status(400).json({ success: false, error: 'PIN must be exactly 4 digits' });
   }
 
   const cleaned = cardNumber.replace(/\D/g, '');
-  if (cleaned.length < 16 || cleaned.length > 19) {
-    return res.status(400).json({ error: 'Invalid EBT card number' });
-  }
-  if (pin.length < 4) {
-    return res.status(400).json({ error: 'PIN must be 4 digits' });
-  }
+  const userKey = sanitizeString(userId) || 'default';
 
   // In production, this would call an EBT payment processor API
   // (e.g., Forage, Soda, or direct USDA FNS integration)
   const last4 = cleaned.slice(-4);
   const mockBalance = 487.50;
 
-  ebtCards.set(userId || 'default', {
+  ebtCards.set(userKey, {
     last4,
     balance: mockBalance,
+    pinHash: pin, // In production: hash the PIN, never store plaintext
     linkedAt: new Date().toISOString(),
   });
 
@@ -59,26 +115,49 @@ app.post('/api/ebt/link', (req, res) => {
 app.get('/api/ebt/balance/:userId', (req, res) => {
   const card = ebtCards.get(req.params.userId) || ebtCards.get('default');
   if (!card) {
-    return res.status(404).json({ error: 'No EBT card linked' });
+    return res.status(404).json({ success: false, error: 'No EBT card linked' });
   }
-  res.json({ balance: card.balance, last4: card.last4 });
+  res.json({ success: true, balance: card.balance, last4: card.last4 });
 });
 
 // Process EBT payment
 app.post('/api/ebt/charge', (req, res) => {
   const { userId, amount, orderId } = req.body;
 
-  const card = ebtCards.get(userId) || ebtCards.get('default');
-  if (!card) {
-    return res.status(404).json({ error: 'No EBT card linked' });
+  // Validate required fields
+  if (!orderId) {
+    return res.status(400).json({ success: false, error: 'Order ID is required' });
   }
+
+  // Idempotency check - prevent double-charging
+  if (processedCharges.has(orderId)) {
+    return res.status(409).json({ success: false, error: 'Order has already been charged' });
+  }
+
+  // Validate amount
+  if (!isValidAmount(amount)) {
+    return res.status(400).json({ success: false, error: 'Invalid charge amount (must be a positive number)' });
+  }
+
+  const userKey = sanitizeString(userId) || 'default';
+  const card = ebtCards.get(userKey);
+  if (!card) {
+    return res.status(404).json({ success: false, error: 'No EBT card linked' });
+  }
+
   if (card.balance < amount) {
-    return res.status(400).json({ error: 'Insufficient EBT balance' });
+    return res.status(402).json({
+      success: false,
+      error: 'Insufficient EBT balance',
+      balance: card.balance,
+      required: amount,
+    });
   }
 
   // In production: call EBT processor to authorize and capture payment
   // EBT-eligible items must be SNAP-approved food items
   card.balance -= amount;
+  processedCharges.add(orderId);
 
   res.json({
     success: true,
@@ -97,8 +176,30 @@ app.post('/api/ebt/charge', (req, res) => {
 app.post('/api/orders', (req, res) => {
   const { userId, items, kitchenId, paymentMethod, address, instructions } = req.body;
 
-  if (!items || items.length === 0) {
-    return res.status(400).json({ error: 'Order must have at least one item' });
+  // Validate items
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, error: 'Order must have at least one item' });
+  }
+
+  // Validate each item has required fields
+  for (const item of items) {
+    if (!item.name || typeof item.price !== 'number' || item.price <= 0) {
+      return res.status(400).json({ success: false, error: 'Each item must have a name and valid price' });
+    }
+    if (!item.quantity || item.quantity < 1 || item.quantity > 50) {
+      return res.status(400).json({ success: false, error: 'Item quantity must be between 1 and 50' });
+    }
+  }
+
+  // Validate kitchen
+  if (kitchenId && !VALID_KITCHEN_IDS.includes(kitchenId)) {
+    return res.status(400).json({ success: false, error: 'Invalid kitchen ID' });
+  }
+
+  // Validate payment method
+  const validPaymentMethods = ['ebt', 'cash'];
+  if (paymentMethod && !validPaymentMethods.includes(paymentMethod)) {
+    return res.status(400).json({ success: false, error: 'Invalid payment method' });
   }
 
   const total = items.reduce((t, item) => t + item.price * item.quantity, 0);
@@ -106,7 +207,7 @@ app.post('/api/orders', (req, res) => {
 
   const order = {
     id: `ORD-${Date.now()}`,
-    userId: userId || 'guest',
+    userId: sanitizeString(userId) || 'guest',
     items,
     kitchenId,
     total,
@@ -121,8 +222,8 @@ app.post('/api/orders', (req, res) => {
         message: 'Order confirmed! Chef is reviewing your order.',
       },
     ],
-    address,
-    instructions,
+    address: sanitizeString(address, 300),
+    instructions: sanitizeString(instructions, 500),
     createdAt: new Date().toISOString(),
     estimatedDelivery: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
   };
@@ -132,7 +233,7 @@ app.post('/api/orders', (req, res) => {
   // Create a corresponding kitchen order with grocery shopping list
   const groceryList = items.flatMap((item) =>
     (item.ingredients || []).map((ing) => ({
-      name: ing,
+      name: sanitizeString(ing, 100),
       checked: false,
     }))
   );
@@ -157,9 +258,9 @@ app.post('/api/orders', (req, res) => {
 app.get('/api/orders/:orderId', (req, res) => {
   const order = orders.get(req.params.orderId);
   if (!order) {
-    return res.status(404).json({ error: 'Order not found' });
+    return res.status(404).json({ success: false, error: 'Order not found' });
   }
-  res.json(order);
+  res.json({ success: true, order });
 });
 
 // Get all orders for a user
@@ -167,7 +268,7 @@ app.get('/api/orders/user/:userId', (req, res) => {
   const userOrders = Array.from(orders.values())
     .filter((o) => o.userId === req.params.userId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json(userOrders);
+  res.json({ success: true, orders: userOrders });
 });
 
 // Update order status
@@ -176,25 +277,37 @@ app.patch('/api/orders/:orderId/status', (req, res) => {
   const order = orders.get(req.params.orderId);
 
   if (!order) {
-    return res.status(404).json({ error: 'Order not found' });
+    return res.status(404).json({ success: false, error: 'Order not found' });
   }
 
-  const validStatuses = ['confirmed', 'shopping', 'preparing', 'cooking', 'ready', 'delivering', 'delivered', 'cancelled'];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
+  if (!status) {
+    return res.status(400).json({ success: false, error: 'Status is required' });
+  }
+
+  // Validate status transition (state machine)
+  const allowedNextStatuses = VALID_TRANSITIONS[order.status];
+  if (!allowedNextStatuses) {
+    return res.status(400).json({ success: false, error: `Unknown current status: ${order.status}` });
+  }
+  if (!allowedNextStatuses.includes(status)) {
+    return res.status(400).json({
+      success: false,
+      error: `Cannot transition from "${order.status}" to "${status}". Allowed: ${allowedNextStatuses.join(', ') || 'none'}`,
+    });
   }
 
   order.status = status;
   order.statusHistory.push({
     status,
     timestamp: new Date().toISOString(),
-    message: message || `Order status updated to ${status}`,
+    message: sanitizeString(message) || `Order status updated to ${status}`,
   });
 
-  // Also update kitchen order
+  // Sync kitchen order status
   const kOrder = kitchenOrders.get(req.params.orderId);
   if (kOrder) {
     kOrder.status = status;
+    kOrder.statusHistory = order.statusHistory;
   }
 
   res.json({ success: true, order });
@@ -208,7 +321,7 @@ app.patch('/api/orders/:orderId/status', (req, res) => {
 app.get('/api/kitchen/orders', (req, res) => {
   const allKitchenOrders = Array.from(kitchenOrders.values())
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json(allKitchenOrders);
+  res.json({ success: true, orders: allKitchenOrders });
 });
 
 // Get active kitchen orders
@@ -216,21 +329,25 @@ app.get('/api/kitchen/orders/active', (req, res) => {
   const active = Array.from(kitchenOrders.values())
     .filter((o) => !['delivered', 'cancelled'].includes(o.status))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json(active);
+  res.json({ success: true, orders: active });
 });
 
 // Update grocery list item (check off an ingredient)
 app.patch('/api/kitchen/orders/:orderId/grocery/:index', (req, res) => {
   const kOrder = kitchenOrders.get(req.params.orderId);
   if (!kOrder) {
-    return res.status(404).json({ error: 'Kitchen order not found' });
+    return res.status(404).json({ success: false, error: 'Kitchen order not found' });
   }
 
-  const index = parseInt(req.params.index);
-  if (index >= 0 && index < kOrder.groceryList.length) {
-    kOrder.groceryList[index].checked = !kOrder.groceryList[index].checked;
+  const index = parseInt(req.params.index, 10);
+  if (isNaN(index) || index < 0 || index >= kOrder.groceryList.length) {
+    return res.status(400).json({
+      success: false,
+      error: `Invalid grocery index. Must be 0-${kOrder.groceryList.length - 1}`,
+    });
   }
 
+  kOrder.groceryList[index].checked = !kOrder.groceryList[index].checked;
   res.json({ success: true, groceryList: kOrder.groceryList });
 });
 
@@ -242,6 +359,7 @@ app.patch('/api/kitchen/orders/:orderId/grocery/:index', (req, res) => {
 app.get('/api/kitchens', (req, res) => {
   // In production, this would come from a database
   res.json({
+    success: true,
     kitchens: [
       { id: 'gk-1', name: "Chef Marcus' Soul Kitchen", cuisineType: 'Southern Comfort', ebtAccepted: true },
       { id: 'gk-2', name: "Maria's Cocina Gourmet", cuisineType: 'Latin Fusion', ebtAccepted: true },
@@ -263,6 +381,17 @@ app.get('/api/health', (req, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });
+});
+
+// ============================================================
+// Global error handler
+// ============================================================
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ success: false, error: 'Invalid JSON in request body' });
+  }
+  console.error(`[ERROR] ${err.message}`);
+  res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
 // ============================================================

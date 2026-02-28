@@ -33,7 +33,7 @@ export default function OrderConfirmationScreen({ navigation }) {
   }, []);
 
   if (!activeOrder) {
-    navigation.reset({ index: 0, routes: [{ name: 'HomeTab' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     return null;
   }
 

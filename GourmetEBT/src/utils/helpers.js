@@ -1,5 +1,13 @@
 export const formatPrice = (price) => {
-  return `$${price.toFixed(2)}`;
+  const safePrice = typeof price === 'number' && !isNaN(price) ? price : 0;
+  return `$${safePrice.toFixed(2)}`;
+};
+
+export const hexToRgba = (hex, alpha = 1) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 export const formatTime = (dateString) => {

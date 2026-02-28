@@ -18,6 +18,7 @@ import {
   getOrderStatusColor,
   getOrderStatusIcon,
   getTimeAgo,
+  hexToRgba,
 } from '../utils/helpers';
 
 export default function OrdersScreen({ navigation }) {
@@ -142,7 +143,7 @@ export default function OrdersScreen({ navigation }) {
                   </View>
                   <View style={[
                     styles.miniStatusBadge,
-                    { backgroundColor: getOrderStatusColor(order.status) + '20' }
+                    { backgroundColor: hexToRgba(getOrderStatusColor(order.status), 0.15) }
                   ]}>
                     <Text style={[
                       styles.miniStatusText,

@@ -32,9 +32,7 @@ export default function ItemDetailScreen({ route, navigation }) {
             style: 'destructive',
             onPress: () => {
               clearCart();
-              for (let i = 0; i < quantity; i++) {
-                addToCart(item, kitchen.id);
-              }
+              addToCart(item, kitchen.id, quantity);
               navigation.goBack();
             },
           },
@@ -46,9 +44,7 @@ export default function ItemDetailScreen({ route, navigation }) {
     if (existingItem) {
       updateQuantity(item.id, currentQuantity + quantity);
     } else {
-      for (let i = 0; i < quantity; i++) {
-        addToCart(item, kitchen.id);
-      }
+      addToCart(item, kitchen.id, quantity);
     }
     navigation.goBack();
   };

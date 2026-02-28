@@ -229,7 +229,7 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.statCard}>
               <MaterialIcons name="savings" size={24} color={colors.ebtGreen} />
               <Text style={styles.statValue}>
-                {formatPrice(orders.reduce((t, o) => t + (o.total - o.groceryCost), 0))}
+                {formatPrice(orders.reduce((t, o) => t + (o.total - (o.groceryCost || 0)), 0))}
               </Text>
               <Text style={styles.statLabel}>Saved vs Eating Out</Text>
             </View>

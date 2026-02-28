@@ -34,22 +34,22 @@ export const useStore = create((set, get) => ({
   cart: [],
   cartKitchenId: null,
 
-  addToCart: (item, kitchenId) => set((state) => {
-    // If cart has items from different kitchen, ask to clear
+  addToCart: (item, kitchenId, qty = 1) => set((state) => {
+    // If cart has items from different kitchen, don't add - UI should handle this case
     if (state.cartKitchenId && state.cartKitchenId !== kitchenId) {
-      return state; // Don't add - UI should handle this case
+      return state;
     }
     const existingIndex = state.cart.findIndex((i) => i.id === item.id);
     if (existingIndex >= 0) {
       const newCart = [...state.cart];
       newCart[existingIndex] = {
         ...newCart[existingIndex],
-        quantity: newCart[existingIndex].quantity + 1,
+        quantity: newCart[existingIndex].quantity + qty,
       };
       return { cart: newCart, cartKitchenId: kitchenId };
     }
     return {
-      cart: [...state.cart, { ...item, quantity: 1 }],
+      cart: [...state.cart, { ...item, quantity: qty }],
       cartKitchenId: kitchenId,
     };
   }),
