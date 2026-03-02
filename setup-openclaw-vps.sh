@@ -1,310 +1,355 @@
 #!/bin/bash
-###############################################################################
-#  OpenClaw VPS Setup Script — Ubuntu 22.04 LTS
-#  Sets up a fresh VPS for OpenClaw development from scratch.
-#
-#  Run as root (or with sudo):
-#    chmod +x setup-openclaw-vps.sh && sudo ./setup-openclaw-vps.sh
-###############################################################################
+
+# ============================================================
+#  OpenClaw + Full Dev Environment Setup Script
+#  Target: Ubuntu 22.04 LTS (fresh VPS)
+#  Run as a non-root user with sudo privileges
+#  Usage: bash setup-openclaw-vps.sh
+# ============================================================
+
 set -euo pipefail
 
-# ─── Colours & helpers ───────────────────────────────────────────────────────
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'
-NC='\033[0m' # No Colour
-info()  { echo -e "${CYAN}[INFO]${NC}  $*"; }
-ok()    { echo -e "${GREEN}[ OK ]${NC}  $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-fail()  { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
+# ─── Prevent sourcing ────────────────────────────────────────
+(return 0 2>/dev/null) && { echo "Do not source this script — run it directly: bash $0" >&2; return 1; }
 
-# ─── Pre-flight checks ──────────────────────────────────────────────────────
-if [[ $EUID -ne 0 ]]; then
-    fail "This script must be run as root.  Try: sudo $0"
-fi
-
-. /etc/os-release 2>/dev/null || true
-if [[ "${VERSION_ID:-}" != "22.04" ]]; then
-    warn "This script targets Ubuntu 22.04.  Detected: ${PRETTY_NAME:-unknown}."
-    warn "Proceeding anyway — some steps may need adjustment."
-fi
-
-echo ""
-echo "============================================================"
-echo "   OpenClaw VPS Development Setup — Ubuntu 22.04"
-echo "============================================================"
-echo ""
-
-###############################################################################
-# 1. SYSTEM UPDATE & ESSENTIAL PACKAGES
-###############################################################################
-info "1/9  Updating system packages …"
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get upgrade -y -qq
-ok "System packages updated."
-
-info "1/9  Installing essential packages …"
-apt-get install -y -qq \
-    build-essential \
-    curl \
-    wget \
-    git \
-    unzip \
-    zip \
-    jq \
-    ca-certificates \
-    gnupg \
-    lsb-release \
-    software-properties-common \
-    apt-transport-https \
-    tmux \
-    htop \
-    tree \
-    vim \
-    nano
-ok "Essential packages installed."
-
-###############################################################################
-# 2. SWAP FILE (many VPS come with little RAM)
-###############################################################################
-info "2/9  Configuring swap …"
-if swapon --show | grep -q '/swapfile'; then
-    ok "Swap already active — skipping."
+# ─── Colors (only when attached to a terminal) ──────────────
+if [[ -t 1 ]] && [[ -t 2 ]]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  CYAN='\033[0;36m'
+  BOLD='\033[1m'
+  RESET='\033[0m'
 else
-    TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-    if (( TOTAL_RAM_KB < 4000000 )); then
-        SWAP_SIZE="2G"
-    else
-        SWAP_SIZE="1G"
-    fi
-    fallocate -l "$SWAP_SIZE" /swapfile
-    chmod 600 /swapfile
-    mkswap /swapfile >/dev/null
-    swapon /swapfile
-    if ! grep -q '/swapfile' /etc/fstab; then
-        echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    fi
-    ok "Swap created (${SWAP_SIZE})."
+  RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; RESET=''
 fi
 
-###############################################################################
-# 3. SECURITY HARDENING
-###############################################################################
-info "3/9  Hardening the server …"
+# ─── Helpers ─────────────────────────────────────────────────
+log()     { printf '%b  %s\n' "${CYAN}[INFO]${RESET}" "$*"; }
+success() { printf '%b  %s\n' "${GREEN}[ OK ]${RESET}" "$*"; }
+warn()    { printf '%b  %s\n' "${YELLOW}[WARN]${RESET}" "$*"; }
+error()   { printf '%b  %s\n' "${RED}[ERROR]${RESET}" "$*" >&2; exit 1; }
+section() { printf '\n%b  %s  %b\n\n' "${BOLD}${CYAN}━━━" "$*" "━━━${RESET}"; }
 
-# ── UFW firewall ──
-apt-get install -y -qq ufw
-ufw default deny incoming  >/dev/null 2>&1 || true
-ufw default allow outgoing >/dev/null 2>&1 || true
-ufw allow OpenSSH          >/dev/null 2>&1 || true
-ufw allow 18789/tcp comment 'OpenClaw Gateway' >/dev/null 2>&1 || true
-ufw allow 3000/tcp  comment 'OpenClaw Dashboard / Dev server' >/dev/null 2>&1 || true
-ufw --force enable          >/dev/null 2>&1 || true
-ok "UFW configured (SSH, 18789, 3000 open)."
+# ─── Cleanup trap ────────────────────────────────────────────
+TEMPFILES=()
+cleanup() {
+  for f in "${TEMPFILES[@]}"; do
+    rm -f "$f" 2>/dev/null || true
+  done
+  if [[ $? -ne 0 ]]; then
+    warn "Script did not complete successfully."
+    warn "The system may be in a partially configured state."
+    warn "Review the output above and re-run the script to continue."
+  fi
+}
+trap cleanup EXIT
 
-# ── fail2ban ──
-apt-get install -y -qq fail2ban
-if [[ ! -f /etc/fail2ban/jail.local ]]; then
-    cat > /etc/fail2ban/jail.local <<'JAIL'
+# ─── Root check ──────────────────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  error "Do NOT run this script as root. Create a regular user first and run with sudo access."
+fi
+
+# ─── Environment ─────────────────────────────────────────────
+export DEBIAN_FRONTEND=noninteractive
+CURRENT_USER="$(id -un)"
+
+section "Starting OpenClaw + Dev Environment Setup"
+log "Running as: ${CURRENT_USER}  |  Host: $(hostname)  |  Date: $(date)"
+
+# ============================================================
+# 1. SYSTEM UPDATE & ESSENTIAL PACKAGES
+# ============================================================
+section "1/10 — System Update & Core Packages"
+
+sudo apt-get update -y
+sudo apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+
+sudo apt-get install -y \
+  curl wget git unzip zip \
+  build-essential software-properties-common \
+  ca-certificates gnupg lsb-release \
+  htop tmux nano vim \
+  net-tools dnsutils jq tree \
+  ufw fail2ban \
+  python3 python3-pip python3-venv \
+  libssl-dev libffi-dev \
+  apt-transport-https
+
+success "Core packages installed."
+
+# ============================================================
+# 2. UFW FIREWALL
+# ============================================================
+section "2/10 — Configuring Firewall (UFW)"
+
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow OpenSSH
+
+# Verify SSH rule exists before enabling — prevents lockout
+if ! sudo ufw status | grep -q "OpenSSH"; then
+  error "Failed to add SSH rule to UFW — aborting to prevent VPS lockout."
+fi
+
+sudo ufw --force enable
+
+success "Firewall enabled. SSH allowed. Port 18789 is localhost-only (use SSH tunnel)."
+
+# ============================================================
+# 3. FAIL2BAN — BRUTE FORCE PROTECTION
+# ============================================================
+section "3/10 — Fail2Ban (SSH Brute Force Protection)"
+
+# Write config BEFORE starting the service so it never runs with defaults
+sudo tee /etc/fail2ban/jail.local > /dev/null <<'EOF'
+[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 5
+
 [sshd]
 enabled  = true
 port     = ssh
-filter   = sshd
 logpath  = /var/log/auth.log
-maxretry = 5
-bantime  = 3600
-JAIL
-fi
-systemctl enable fail2ban  >/dev/null 2>&1
-systemctl restart fail2ban >/dev/null 2>&1
-ok "fail2ban enabled."
-
-# ── SSH hardening ──
-SSHD_CONFIG="/etc/ssh/sshd_config"
-if grep -q "^PermitRootLogin yes" "$SSHD_CONFIG" 2>/dev/null; then
-    warn "Root login via SSH is enabled. Consider disabling it after creating a regular user."
-    warn "  -> Set 'PermitRootLogin no' in $SSHD_CONFIG and restart sshd."
-fi
-
-###############################################################################
-# 4. NODE.JS 22 (required by OpenClaw)
-###############################################################################
-info "4/9  Installing Node.js 22 …"
-if command -v node &>/dev/null; then
-    CURRENT_NODE=$(node --version | sed 's/v//' | cut -d. -f1)
-    if (( CURRENT_NODE >= 22 )); then
-        ok "Node.js $(node --version) already installed — meets requirement."
-    else
-        warn "Node.js $(node --version) is too old. Installing v22 …"
-        apt-get remove -y nodejs npm 2>/dev/null || true
-    fi
-fi
-
-if ! command -v node &>/dev/null || (( $(node --version | sed 's/v//' | cut -d. -f1) < 22 )); then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1
-    apt-get install -y -qq nodejs
-    ok "Node.js $(node --version) installed."
-fi
-
-###############################################################################
-# 5. PNPM (OpenClaw's primary package manager for development)
-###############################################################################
-info "5/9  Installing pnpm …"
-if command -v pnpm &>/dev/null; then
-    ok "pnpm $(pnpm --version) already installed."
-else
-    npm install -g pnpm@latest >/dev/null 2>&1
-    ok "pnpm $(pnpm --version) installed."
-fi
-
-###############################################################################
-# 6. GO (for the OpenClaw Gateway component)
-###############################################################################
-info "6/9  Installing Go …"
-GO_VERSION="1.23.6"
-if command -v go &>/dev/null; then
-    ok "Go $(go version | awk '{print $3}') already installed."
-else
-    GO_ARCH="amd64"
-    if [[ "$(uname -m)" == "aarch64" ]]; then GO_ARCH="arm64"; fi
-    GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
-    wget -q "https://go.dev/dl/${GO_TAR}" -O "/tmp/${GO_TAR}"
-    rm -rf /usr/local/go
-    tar -C /usr/local -xzf "/tmp/${GO_TAR}"
-    rm "/tmp/${GO_TAR}"
-
-    # Make Go available system-wide
-    cat > /etc/profile.d/go.sh <<'GOENV'
-export PATH=$PATH:/usr/local/go/bin
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOPATH/bin
-GOENV
-    export PATH=$PATH:/usr/local/go/bin
-    ok "Go $(/usr/local/go/bin/go version | awk '{print $3}') installed."
-fi
-
-###############################################################################
-# 7. ADDITIONAL DEV TOOLS
-###############################################################################
-info "7/9  Installing additional development tools …"
-
-# ── Docker ──
-if command -v docker &>/dev/null; then
-    ok "Docker already installed."
-else
-    info "  Installing Docker …"
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-        gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
-    chmod a+r /etc/apt/keyrings/docker.gpg
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
-      tee /etc/apt/sources.list.d/docker.list >/dev/null
-    apt-get update -qq
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    systemctl enable docker >/dev/null 2>&1
-    ok "Docker installed."
-fi
-
-# ── Git (configure default branch) ──
-git config --global init.defaultBranch main 2>/dev/null || true
-
-ok "Dev tools ready."
-
-###############################################################################
-# 8. OPENCLAW — CLONE & BUILD FROM SOURCE
-###############################################################################
-info "8/9  Setting up OpenClaw for development …"
-
-OPENCLAW_DIR="/opt/openclaw"
-if [[ -d "$OPENCLAW_DIR/.git" ]]; then
-    ok "OpenClaw repo already cloned at $OPENCLAW_DIR."
-else
-    git clone https://github.com/openclaw/openclaw.git "$OPENCLAW_DIR"
-    ok "OpenClaw cloned to $OPENCLAW_DIR."
-fi
-
-cd "$OPENCLAW_DIR"
-
-info "  Running pnpm install …"
-pnpm install --frozen-lockfile 2>/dev/null || pnpm install
-
-info "  Building UI …"
-pnpm ui:build 2>/dev/null || warn "ui:build step skipped (may not exist in this version)."
-
-info "  Building OpenClaw …"
-pnpm build
-
-ok "OpenClaw built from source."
-
-# Also install globally for CLI access
-info "  Installing openclaw CLI globally …"
-npm install -g openclaw@latest 2>/dev/null || warn "Global npm install skipped — use local build instead."
-
-###############################################################################
-# 9. SYSTEMD SERVICE (optional — for running the gateway persistently)
-###############################################################################
-info "9/9  Creating systemd service for OpenClaw Gateway …"
-
-SERVICE_FILE="/etc/systemd/system/openclaw-gateway.service"
-if [[ ! -f "$SERVICE_FILE" ]]; then
-    cat > "$SERVICE_FILE" <<EOF
-[Unit]
-Description=OpenClaw Gateway
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=${OPENCLAW_DIR}
-ExecStart=/usr/bin/env node dist/gateway.js --port 18789
-Restart=on-failure
-RestartSec=5
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
+backend  = auto
 EOF
-    systemctl daemon-reload
-    ok "Systemd service created (openclaw-gateway)."
-    info "  Start it with:  systemctl start openclaw-gateway"
-    info "  Enable on boot: systemctl enable openclaw-gateway"
-else
-    ok "Systemd service already exists."
+
+sudo systemctl enable fail2ban
+sudo systemctl restart fail2ban
+
+success "Fail2Ban configured and running."
+
+# ============================================================
+# 4. NODE.JS 22 (required by OpenClaw)
+# ============================================================
+section "4/10 — Node.js 22 (LTS)"
+
+# Download setup script to a temp file instead of piping to bash
+NODESOURCE_SCRIPT="$(mktemp)"
+TEMPFILES+=("$NODESOURCE_SCRIPT")
+curl -fsSL https://deb.nodesource.com/setup_22.x -o "$NODESOURCE_SCRIPT"
+
+if [[ ! -s "$NODESOURCE_SCRIPT" ]]; then
+  error "NodeSource setup script download failed or is empty."
 fi
 
-###############################################################################
-# SUMMARY
-###############################################################################
+sudo -E bash "$NODESOURCE_SCRIPT"
+sudo apt-get install -y nodejs
+
+NODE_VER=$(node --version)
+NPM_VER=$(npm --version)
+success "Node.js installed: ${NODE_VER}  |  npm: ${NPM_VER}"
+
+# Configure global npm directory (no sudo needed for global installs)
+mkdir -p "${HOME}/.npm-global"
+npm config set prefix "${HOME}/.npm-global"
+
+# Add npm global bin to PATH — write to .profile so both bash and zsh pick it up
+for PROFILE_FILE in "${HOME}/.profile" "${HOME}/.bashrc"; do
+  if [[ -f "$PROFILE_FILE" ]] && ! grep -qF '.npm-global' "$PROFILE_FILE"; then
+    {
+      echo ''
+      echo '# npm global packages'
+      echo 'export PATH="$HOME/.npm-global/bin:$PATH"'
+    } >> "$PROFILE_FILE"
+  fi
+done
+
+export PATH="${HOME}/.npm-global/bin:${PATH}"
+success "npm global directory configured at ~/.npm-global"
+
+# ============================================================
+# 5. OPENCLAW INSTALLATION
+# ============================================================
+section "5/10 — Installing OpenClaw"
+
+log "Installing OpenClaw globally via npm …"
+npm install -g openclaw@latest
+
+# Verify it actually installed — don't silently mask failure
+if ! command -v openclaw &>/dev/null; then
+  error "OpenClaw binary not found in PATH after install. Check npm global prefix."
+fi
+
+OC_VER=$(openclaw --version 2>/dev/null || echo "unknown")
+success "OpenClaw installed: ${OC_VER}"
+log "After this script finishes, run:  openclaw onboard"
+
+# ============================================================
+# 6. CLAWHUB (Skills Package Manager)
+# ============================================================
+section "6/10 — ClawHub (Skill Manager)"
+
+npm install -g clawhub
+
+if command -v clawhub &>/dev/null; then
+  success "ClawHub installed. Use 'clawhub search <topic>' to find skills."
+else
+  warn "ClawHub binary not found in PATH — you may need to source your profile first."
+fi
+
+# ============================================================
+# 7. DOCKER + DOCKER COMPOSE
+# ============================================================
+section "7/10 — Docker & Docker Compose"
+
+# Add Docker's official GPG key (idempotent — uses tee instead of gpg --dearmor)
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add Docker repo (use lsb_release to avoid unbound variable risk)
+UBUNTU_CODENAME="$(lsb_release -cs)"
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Add current user to docker group
+sudo usermod -aG docker "${CURRENT_USER}"
+
+sudo systemctl enable docker
+sudo systemctl start docker
+
+success "Docker installed. Log out and back in for docker group to take effect."
+
+# ============================================================
+# 8. GIT CONFIGURATION
+# ============================================================
+section "8/10 — Git Setup"
+
+git config --global init.defaultBranch main
+git config --global core.editor nano
+
+if [[ -z "$(git config --global user.name 2>/dev/null || true)" ]]; then
+  warn "Git user.name not set. Update it after setup:"
+  warn "  git config --global user.name  'Your Name'"
+  warn "  git config --global user.email 'you@example.com'"
+else
+  success "Git already configured for: $(git config --global user.name)"
+fi
+
+# ============================================================
+# 9. OPENCLAW SECURITY CONFIGURATION
+# ============================================================
+section "9/10 — OpenClaw Security Configuration"
+
+OPENCLAW_CONFIG_DIR="${HOME}/.openclaw"
+mkdir -p "${OPENCLAW_CONFIG_DIR}"
+OPENCLAW_CONFIG="${OPENCLAW_CONFIG_DIR}/openclaw.json"
+
+if [[ -f "$OPENCLAW_CONFIG" ]]; then
+  warn "openclaw.json already exists — skipping to avoid overwriting your config."
+else
+  # Write config with restrictive permissions (may later hold auth tokens)
+  (
+    umask 077
+    cat > "$OPENCLAW_CONFIG" <<'EOF'
+{
+  "gateway": {
+    "address": "127.0.0.1",
+    "port": 18789,
+    "auth": {
+      "mode": "token"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "claude-sonnet-4-6"
+      }
+    }
+  }
+}
+EOF
+  )
+  success "Secure openclaw.json written to ${OPENCLAW_CONFIG} (mode 600)"
+  warn "  gateway.address = 127.0.0.1 (localhost only — never expose publicly)"
+  warn "  auth.mode = token (token-protected access)"
+fi
+
+# ============================================================
+# 10. USEFUL DEV TOOLS
+# ============================================================
+section "10/10 — Extra Dev Tools"
+
+# Python tools (Ubuntu 22.04 ships pip 22 which doesn't need --break-system-packages)
+pip3 install --upgrade pip 2>/dev/null || true
+
+# GitHub CLI — use tee for key download with explicit permissions
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  | sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+sudo chmod a+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+  https://cli.github.com/packages stable main" \
+  | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+sudo apt-get update -y
+sudo apt-get install -y gh
+
+success "GitHub CLI (gh) installed — run 'gh auth login' to connect your account."
+
+# ripgrep (fast code search)
+sudo apt-get install -y ripgrep
+success "ripgrep installed."
+
+# ============================================================
+# FINAL SUMMARY
+# ============================================================
+section "Setup Complete — What To Do Next"
+
+printf '%b\n' "${BOLD}Installed:${RESET}"
+printf '  %b %s\n' "${GREEN}*${RESET}" "Node.js     $(node --version)"
+printf '  %b %s\n' "${GREEN}*${RESET}" "npm         $(npm --version)"
+printf '  %b %s\n' "${GREEN}*${RESET}" "git         $(git --version | awk '{print $3}')"
+printf '  %b %s\n' "${GREEN}*${RESET}" "docker      $(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',')"
+printf '  %b %s\n' "${GREEN}*${RESET}" "python3     $(python3 --version 2>/dev/null | awk '{print $2}')"
+printf '  %b %s\n' "${GREEN}*${RESET}" "gh          $(gh --version 2>/dev/null | head -1 | awk '{print $3}')"
+printf '  %b %s\n' "${GREEN}*${RESET}" "openclaw    ${OC_VER}"
+printf '  %b %s\n' "${GREEN}*${RESET}" "clawhub     installed"
+printf '  %b %s\n' "${GREEN}*${RESET}" "ufw         enabled"
+printf '  %b %s\n' "${GREEN}*${RESET}" "fail2ban    running"
+
 echo ""
-echo "============================================================"
-echo "   Setup Complete!"
-echo "============================================================"
+printf '%b\n' "${BOLD}${YELLOW}NEXT STEPS:${RESET}"
 echo ""
-echo "  Installed:"
-echo "    Node.js     : $(node --version)"
-echo "    npm         : $(npm --version)"
-echo "    pnpm        : $(pnpm --version 2>/dev/null || echo 'n/a')"
-echo "    Go          : $(/usr/local/go/bin/go version 2>/dev/null | awk '{print $3}' || echo 'n/a')"
-echo "    Docker      : $(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',' || echo 'n/a')"
-echo "    OpenClaw    : ${OPENCLAW_DIR}"
+printf '  1. %b\n' "${CYAN}Source your shell:${RESET}"
+echo "     source ~/.profile"
 echo ""
-echo "  Firewall (UFW):"
-echo "    SSH (22)     — allowed"
-echo "    18789        — OpenClaw Gateway"
-echo "    3000         — Dev server / Dashboard"
+printf '  2. %b\n' "${CYAN}Run OpenClaw onboarding:${RESET}"
+echo "     openclaw onboard"
+echo "     -> Choose: QuickStart"
+echo "     -> Pick your AI provider (Anthropic/Claude recommended)"
+echo "     -> Connect a chat channel (Telegram is easiest)"
+echo "     -> Select 'Hatch in TUI' to start"
 echo ""
-echo "  Next steps:"
-echo "    1. Source the Go env:       source /etc/profile.d/go.sh"
-echo "    2. Run onboarding:          cd ${OPENCLAW_DIR} && pnpm openclaw onboard --install-daemon"
-echo "    3. Check health:            openclaw doctor"
-echo "    4. Open dashboard:          openclaw dashboard"
-echo "    5. Start dev loop:          cd ${OPENCLAW_DIR} && pnpm gateway:watch"
+printf '  3. %b\n' "${CYAN}Start OpenClaw gateway (after onboarding):${RESET}"
+echo "     openclaw gateway start"
 echo ""
-echo "  Optional:"
-echo "    - Build Go gateway:         cd ${OPENCLAW_DIR}/gateway && go build -o openclaw-gateway ."
-echo "    - Create a non-root user:   adduser devuser && usermod -aG docker,sudo devuser"
-echo "    - Disable root SSH login:   edit /etc/ssh/sshd_config -> PermitRootLogin no"
+printf '  4. %b\n' "${CYAN}Open the web dashboard via SSH tunnel on your LOCAL machine:${RESET}"
+echo "     ssh -L 18789:127.0.0.1:18789 ${CURRENT_USER}@YOUR_VPS_IP"
+echo "     Then open http://127.0.0.1:18789 in your browser"
 echo ""
-echo "  Docs: https://docs.openclaw.ai"
-echo "  Repo: https://github.com/openclaw/openclaw"
-echo "============================================================"
+printf '  5. %b\n' "${CYAN}Connect GitHub (for coding workflows):${RESET}"
+echo "     gh auth login"
+echo ""
+printf '  6. %b\n' "${CYAN}Install coding skills via ClawHub:${RESET}"
+echo "     clawhub search coding"
+echo "     clawhub search github"
+echo ""
+printf '  7. %b\n' "${CYAN}Log out and back in so Docker group permissions apply:${RESET}"
+echo "     exit  (then reconnect via SSH)"
+echo ""
+printf '%b\n' "${RED}${BOLD}SECURITY REMINDERS:${RESET}"
+echo "  * Never expose port 18789 to the public internet"
+echo "  * Always use SSH tunnel to access the dashboard"
+echo "  * Review any community skills before installing them"
+echo "  * openclaw.json permissions are 600 (owner-only read/write)"
+echo ""
+success "You're ready. Run: source ~/.profile && openclaw onboard"
+echo ""
