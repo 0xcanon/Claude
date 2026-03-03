@@ -1,0 +1,16 @@
+{
+  "name": "openclaw-bustabit-bot",
+  "version": "2.0.0",
+  "description": "Self-improving AI-powered Bustabit gambling bot with adaptive strategies and bankroll protection",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "simulate": "node src/index.js --simulate",
+    "backtest": "node src/backtest.js",
+    "stats": "node src/stats.js",
+    "test": "node src/test.js"
+  },
+  "keywords": ["bustabit", "bot", "gambling", "ai", "adaptive"],
+  "license": "MIT",
+  "dependencies": {}
+}
