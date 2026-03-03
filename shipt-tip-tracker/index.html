@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Track Shipt delivery tips by address. Know who tips before you accept.">
+  <title>Shipt Tip Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="logo">
+        <span class="logo-icon">&#x1F6D2;</span>
+        <h1>Shipt Tip Tracker</h1>
+      </div>
+      <button id="menuBtn" class="icon-btn" aria-label="Menu">&#9776;</button>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-bar">
+      <button class="tab active" data-tab="lookup">
+        <span class="tab-icon">&#128269;</span>
+        <span>Lookup</span>
+      </button>
+      <button class="tab" data-tab="log">
+        <span class="tab-icon">&#10133;</span>
+        <span>Log Order</span>
+      </button>
+      <button class="tab" data-tab="history">
+        <span class="tab-icon">&#128203;</span>
+        <span>History</span>
+      </button>
+      <button class="tab" data-tab="stats">
+        <span class="tab-icon">&#128200;</span>
+        <span>Stats</span>
+      </button>
+    </nav>
+
+    <!-- LOOKUP TAB -->
+    <section id="tab-lookup" class="tab-content active">
+      <div class="search-box">
+        <input type="text" id="lookupInput" placeholder="Search address before accepting..." autocomplete="off">
+        <button id="lookupBtn" class="btn btn-primary">Search</button>
+      </div>
+      <div id="lookupResults" class="results-area">
+        <div class="empty-state">
+          <span class="empty-icon">&#128270;</span>
+          <p>Search an address to see tip history</p>
+          <p class="hint">Type a street name, number, or partial address</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOG ORDER TAB -->
+    <section id="tab-log" class="tab-content">
+      <form id="logForm" class="form">
+        <h2>Log a Delivery</h2>
+
+        <div class="form-group">
+          <label for="orderAddress">Delivery Address *</label>
+          <input type="text" id="orderAddress" placeholder="123 Main St, City, ST" required autocomplete="street-address">
+          <div id="addressSuggestions" class="suggestions"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="customerName">Customer Name (optional)</label>
+          <input type="text" id="customerName" placeholder="First name or initial">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="orderTotal">Order Total ($)</label>
+            <input type="number" id="orderTotal" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label for="orderPay">Shipt Pay ($)</label>
+            <input type="number" id="orderPay" placeholder="0.00" step="0.01" min="0">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="tipAmount">Tip Amount ($) *</label>
+            <input type="number" id="tipAmount" placeholder="0.00" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="orderDate">Date</label>
+            <input type="date" id="orderDate">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="orderNotes">Notes (optional)</label>
+          <textarea id="orderNotes" placeholder="Heavy order, apartment upstairs, etc." rows="2"></textarea>
+        </div>
+
+        <div class="tip-quick-btns">
+          <span class="label">Quick tip:</span>
+          <button type="button" class="quick-tip" data-tip="0">$0</button>
+          <button type="button" class="quick-tip" data-tip="5">$5</button>
+          <button type="button" class="quick-tip" data-tip="10">$10</button>
+          <button type="button" class="quick-tip" data-tip="15">$15</button>
+          <button type="button" class="quick-tip" data-tip="20">$20</button>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Save Delivery</button>
+      </form>
+    </section>
+
+    <!-- HISTORY TAB -->
+    <section id="tab-history" class="tab-content">
+      <div class="history-controls">
+        <input type="text" id="historySearch" placeholder="Filter history...">
+        <select id="historySort">
+          <option value="date-desc">Newest First</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="tip-desc">Highest Tip</option>
+          <option value="tip-asc">Lowest Tip</option>
+        </select>
+      </div>
+      <div id="historyList" class="history-list"></div>
+    </section>
+
+    <!-- STATS TAB -->
+    <section id="tab-stats" class="tab-content">
+      <div id="statsContent" class="stats-grid"></div>
+    </section>
+
+    <!-- SIDE MENU -->
+    <div id="sideMenu" class="side-menu">
+      <div class="menu-header">
+        <h2>Settings</h2>
+        <button id="closeMenu" class="icon-btn">&times;</button>
+      </div>
+      <div class="menu-body">
+        <button id="importCsvBtn" class="menu-item">
+          <span>&#128228;</span> Import Shipt CSV Data
+        </button>
+        <input type="file" id="csvFileInput" accept=".csv" hidden>
+
+        <button id="exportDataBtn" class="menu-item">
+          <span>&#128229;</span> Export All Data (JSON)
+        </button>
+
+        <button id="importJsonBtn" class="menu-item">
+          <span>&#128228;</span> Import Data (JSON)
+        </button>
+        <input type="file" id="jsonFileInput" accept=".json" hidden>
+
+        <hr>
+
+        <button id="clearDataBtn" class="menu-item danger">
+          <span>&#128465;</span> Clear All Data
+        </button>
+
+        <div class="menu-info">
+          <h3>How to Use with Shipt</h3>
+          <ol>
+            <li>After each delivery, log the address and tip here</li>
+            <li>When a new order pops up, search the address in Lookup</li>
+            <li>See instant tip history to decide if it's worth it</li>
+          </ol>
+          <h3>Importing Shipt History</h3>
+          <p>Go to <strong>shipt.com</strong> &rarr; Payment History &rarr; Download CSV. Then use "Import Shipt CSV Data" above.</p>
+          <h3>Tip Ratings</h3>
+          <ul>
+            <li><span class="dot green"></span> Great tipper ($10+ avg or 15%+)</li>
+            <li><span class="dot yellow"></span> Decent tipper ($5-10 avg)</li>
+            <li><span class="dot orange"></span> Low tipper (under $5 avg)</li>
+            <li><span class="dot red"></span> No tipper ($0 history)</li>
+            <li><span class="dot gray"></span> New / not enough data</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div id="overlay" class="overlay"></div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

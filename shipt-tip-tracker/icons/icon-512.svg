@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
+  <circle cx="256" cy="192" r="96" fill="#4ecca3" opacity="0.2"/>
+  <text x="256" y="225" text-anchor="middle" font-size="128" fill="#4ecca3" font-family="Arial, sans-serif" font-weight="bold">$</text>
+  <text x="256" y="360" text-anchor="middle" font-size="52" fill="#e8e8f0" font-family="Arial, sans-serif" font-weight="bold">TIPS</text>
+  <rect x="96" y="396" width="320" height="8" rx="4" fill="#4ecca3" opacity="0.5"/>
+</svg>
