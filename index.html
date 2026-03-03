@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Shipt Tipper Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        <span class="logo-text">Shipt Tipper Tracker</span>
+      </div>
+      <button class="icon-btn" id="menuBtn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Dropdown Menu -->
+    <div class="dropdown-menu" id="dropdownMenu">
+      <button class="dropdown-item" id="exportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Data
+      </button>
+      <button class="dropdown-item" id="importBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import Data
+      </button>
+      <button class="dropdown-item danger" id="clearAllBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        Clear All Data
+      </button>
+      <input type="file" id="importFile" accept=".json" hidden>
+    </div>
+
+    <!-- Quick Search Bar (always visible) -->
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search address before accepting order..." autocomplete="off">
+      <button class="clear-search" id="clearSearch">&times;</button>
+    </div>
+
+    <!-- Search Results Overlay -->
+    <div class="search-results" id="searchResults"></div>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab active" data-tab="deliveries">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Deliveries
+      </button>
+      <button class="tab" data-tab="add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Log Delivery
+      </button>
+      <button class="tab" data-tab="stats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Stats
+      </button>
+      <button class="tab" data-tab="map">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Zones
+      </button>
+    </nav>
+
+    <!-- Tab Content -->
+    <main class="tab-content">
+
+      <!-- DELIVERIES TAB -->
+      <section class="panel active" id="deliveriesPanel">
+        <div class="filter-row">
+          <button class="filter-chip active" data-filter="all">All</button>
+          <button class="filter-chip great" data-filter="great">Great Tippers</button>
+          <button class="filter-chip decent" data-filter="decent">Decent</button>
+          <button class="filter-chip none" data-filter="none">No Tip</button>
+          <button class="filter-chip new" data-filter="new">First Time</button>
+        </div>
+        <div class="sort-row">
+          <select id="sortSelect">
+            <option value="recent">Most Recent</option>
+            <option value="tip-high">Highest Tip</option>
+            <option value="tip-low">Lowest Tip</option>
+            <option value="frequency">Most Deliveries</option>
+            <option value="alpha">A-Z Address</option>
+          </select>
+        </div>
+        <div id="deliveryList" class="delivery-list"></div>
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <h3>No deliveries yet</h3>
+          <p>Tap "Log Delivery" to start tracking your Shipt tips!</p>
+        </div>
+      </section>
+
+      <!-- ADD DELIVERY TAB -->
+      <section class="panel" id="addPanel">
+        <h2 class="panel-title">Log a Shipt Delivery</h2>
+        <form id="deliveryForm" autocomplete="off">
+          <div class="form-group">
+            <label>Customer Address *</label>
+            <input type="text" id="addressInput" placeholder="123 Main St, Apt 4B" required>
+            <div class="address-suggestions" id="addressSuggestions"></div>
+          </div>
+          <div class="form-group">
+            <label>City / Neighborhood</label>
+            <input type="text" id="zoneInput" placeholder="e.g. Midtown, Buckhead, etc.">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Order Total ($)</label>
+              <input type="number" id="orderTotal" placeholder="0.00" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+              <label>Tip Amount ($) *</label>
+              <input type="number" id="tipAmount" placeholder="0.00" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Shipt Pay ($)</label>
+            <input type="number" id="shiptPay" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label>Number of Items</label>
+            <input type="number" id="itemCount" placeholder="e.g. 35" min="0">
+          </div>
+          <div class="form-group">
+            <label>Delivery Date</label>
+            <input type="date" id="deliveryDate">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="notesInput" placeholder="Gate code, dog in yard, preferred drop-off, communication style..." rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Rating</label>
+            <div class="star-rating" id="starRating">
+              <span class="star" data-value="1">&#9733;</span>
+              <span class="star" data-value="2">&#9733;</span>
+              <span class="star" data-value="3">&#9733;</span>
+              <span class="star" data-value="4">&#9733;</span>
+              <span class="star" data-value="5">&#9733;</span>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="submitBtn">Save Delivery</button>
+        </form>
+      </section>
+
+      <!-- STATS TAB -->
+      <section class="panel" id="statsPanel">
+        <h2 class="panel-title">Your Shipt Stats</h2>
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Total Deliveries</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-value" id="statTipRate">0%</div>
+            <div class="stat-label">Tip Rate</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-value" id="statAvgTip">$0</div>
+            <div class="stat-label">Avg Tip</div>
+          </div>
+          <div class="stat-card gold">
+            <div class="stat-value" id="statBestTip">$0</div>
+            <div class="stat-label">Best Tip</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-value" id="statTotalTips">$0</div>
+            <div class="stat-label">Total Tips Earned</div>
+          </div>
+          <div class="stat-card teal">
+            <div class="stat-value" id="statTotalPay">$0</div>
+            <div class="stat-label">Total Shipt Pay</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-value" id="statAvgOrder">$0</div>
+            <div class="stat-label">Avg Order Size</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-value" id="statRepeat">0</div>
+            <div class="stat-label">Repeat Customers</div>
+          </div>
+        </div>
+        <h3 class="section-title">Tip Breakdown</h3>
+        <div class="tip-breakdown" id="tipBreakdown">
+          <div class="breakdown-bar">
+            <div class="bar-segment great" id="barGreat" style="width:0%"></div>
+            <div class="bar-segment decent" id="barDecent" style="width:0%"></div>
+            <div class="bar-segment none" id="barNone" style="width:0%"></div>
+          </div>
+          <div class="breakdown-legend">
+            <span class="legend-item great"><span class="dot"></span> Great ($10+)</span>
+            <span class="legend-item decent"><span class="dot"></span> Decent ($1-9)</span>
+            <span class="legend-item none"><span class="dot"></span> No Tip</span>
+          </div>
+        </div>
+        <h3 class="section-title">Weekly Trend</h3>
+        <div class="chart-container" id="weeklyChart"></div>
+        <h3 class="section-title">Best Days to Work</h3>
+        <div class="day-grid" id="dayGrid"></div>
+      </section>
+
+      <!-- ZONES TAB -->
+      <section class="panel" id="mapPanel">
+        <h2 class="panel-title">Zone Performance</h2>
+        <p class="panel-subtitle">See which neighborhoods tip the best</p>
+        <div id="zoneList" class="zone-list"></div>
+        <div class="empty-state" id="zoneEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+          <h3>No zones yet</h3>
+          <p>Add a city/neighborhood when logging deliveries to see zone stats.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Edit Delivery</h3>
+          <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <form id="editForm" autocomplete="off">
+          <input type="hidden" id="editId">
+          <div class="form-group">
+            <label>Customer Address</label>
+            <input type="text" id="editAddress" required>
+          </div>
+          <div class="form-group">
+            <label>City / Neighborhood</label>
+            <input type="text" id="editZone">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Order Total ($)</label>
+              <input type="number" id="editOrderTotal" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+              <label>Tip Amount ($)</label>
+              <input type="number" id="editTipAmount" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Shipt Pay ($)</label>
+            <input type="number" id="editShiptPay" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label>Number of Items</label>
+            <input type="number" id="editItemCount" min="0">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="editNotes" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Rating</label>
+            <div class="star-rating" id="editStarRating">
+              <span class="star" data-value="1">&#9733;</span>
+              <span class="star" data-value="2">&#9733;</span>
+              <span class="star" data-value="3">&#9733;</span>
+              <span class="star" data-value="4">&#9733;</span>
+              <span class="star" data-value="5">&#9733;</span>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-danger" id="deleteBtn">Delete</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
