@@ -55,8 +55,8 @@ export function WelcomeScreen({
 
         <View style={styles.shippingCard}>
           <Text style={styles.shippingKicker}>SIMPLE BOX SHIPPING</Text>
-          <Text style={styles.shippingTitle}>{shipping.formattedRate} per box</Text>
-          <Text style={styles.shippingText}>Bread is ordered by the case. Each box holds up to {shipping.unitsPerBox} breads, and partial boxes count as a full box.</Text>
+          <Text style={styles.shippingTitle}>One case, one box</Text>
+          <Text style={styles.shippingText}>Bread is ordered by the case. Each case ships as its own box of up to {shipping.unitsPerBox} breads, and your exact shipping cost shows in your account before you pay.</Text>
         </View>
 
         <Text onPress={() => void Linking.openURL("mailto:sales@dallasbakery.com")} style={styles.help}>

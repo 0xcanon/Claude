@@ -5,10 +5,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const shipping = await getWholesaleShippingSettings();
-  // The site, the buyer app, and the emails all read these from one place,
-  // so a buyer can never be quoted two different sets of rules.
+  // This endpoint is public, and prices are account-only: the payload carries
+  // pack facts and ordering rules, never a rate. Signed-in surfaces get the
+  // real shipping price from /api/buyer/catalog, which requires a session.
   return Response.json(
-    { shipping, orderRules: orderRules(), cutoff: cutoffState() },
+    {
+      shipping: { unitsPerBox: shipping.unitsPerBox },
+      orderRules: orderRules(),
+      cutoff: cutoffState(),
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

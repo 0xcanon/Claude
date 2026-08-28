@@ -64,7 +64,7 @@ export default async function OrderPage() {
             <li><span>02</span><p><strong>Store locations</strong>Choose the approved delivery location at checkout.</p></li>
             <li><span>03</span><p><strong>Private catalog</strong>See wholesale products and account pricing after sign-in.</p></li>
             <li><span>04</span><p><strong>Card checkout</strong>Pay by card without leaving Dallas Bakery, then track every box.</p></li>
-            <li><span>05</span><p><strong>Case shipping</strong>{shipping.formattedRate} per case — one case, one box of {shipping.unitsPerBox} loaves.</p></li>
+            <li><span>05</span><p><strong>Case shipping</strong>One case ships as its own box of {shipping.unitsPerBox} loaves — the rate and full total show in your account before you pay.</p></li>
           </ul>
         </aside>
       </section>

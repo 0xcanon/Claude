@@ -1,6 +1,5 @@
 import type {
   ApplicationInput,
-  ShippingSettings,
   TrackedApplication,
 } from "../types";
 
@@ -66,8 +65,12 @@ async function request<T>(
   return data as T;
 }
 
+/**
+ * Public pack facts only. Prices are account-only, so this endpoint carries
+ * no rate — the signed-in catalog payload delivers the real shipping price.
+ */
 export async function getShippingSettings() {
-  const result = await request<{ shipping: ShippingSettings }>("/api/wholesale-settings");
+  const result = await request<{ shipping: { unitsPerBox: number } }>("/api/wholesale-settings");
   return result.shipping;
 }
 

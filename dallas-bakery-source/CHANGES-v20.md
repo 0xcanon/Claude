@@ -59,6 +59,17 @@ exclusive prices set and cleared from /admin — plus 81 automated tests
   applies to its SKU only, invalid values fall back to list, shipping is
   untouched).
 
+## No public prices at all
+
+- Nothing outside a signed-in account shows a dollar figure anywhere. The
+  public home page, the /order landing, and the /apply page describe how
+  ordering and per-case shipping work without quoting a rate; the public
+  settings endpoint (`/api/wholesale-settings`) now carries pack facts and
+  ordering rules only, never a price. The app's pre-sign-in welcome screen
+  says "One case, one box" instead of a rate, and the app never displays a
+  price the server did not send for that signed-in account. Verified live:
+  the rendered public pages contain zero dollar figures.
+
 ## Also in this round
 
 - The four merge-round fixes are folded in: the mobile card layout for the

@@ -72,10 +72,13 @@ type Screen =
 const ORDER_POLL_ATTEMPTS = 12;
 const ORDER_POLL_INTERVAL_MS = 1500;
 
+// Placeholder until the signed-in catalog delivers the real shipping price.
+// The rate is deliberately blank: no price is ever asserted that the server
+// did not send for this account, and public screens show no rate at all.
 const DEFAULT_SHIPPING: ShippingSettings = {
-  rateCents: 1250,
+  rateCents: 0,
   unitsPerBox: 25,
-  formattedRate: "$12.50",
+  formattedRate: "",
   updatedAt: null,
 };
 
@@ -150,6 +153,9 @@ export default function App() {
       setProducts(payload.products);
       setCutoff(payload.cutoff || null);
       setCredit(payload.credit || null);
+      // The account's real shipping price rides in on the signed-in catalog —
+      // the only place the app ever learns a rate.
+      if (payload.shipping) setShipping(payload.shipping);
       // The standing order rides along on every catalog load, so the cart and
       // account screens always show its current state.
       getStandingOrder(buyerSession)
@@ -177,7 +183,9 @@ export default function App() {
         getShippingSettings().catch(() => DEFAULT_SHIPPING),
       ]);
       if (!active) return;
-      setShipping(liveShipping);
+      // The public payload carries pack facts only — the rate arrives with
+      // the signed-in catalog.
+      setShipping((current) => ({ ...current, unitsPerBox: liveShipping.unitsPerBox }));
       if (storedTracking) {
         setTrackingToken(storedTracking);
         try {
@@ -306,7 +314,6 @@ export default function App() {
         : next.locations[0]?.id || "";
       setSelectedLocationId(nextLocation);
       if (nextLocation) await loadCatalog(session, nextLocation);
-      setShipping(await getShippingSettings().catch(() => shipping));
     } catch (caught) {
       if (caught instanceof BuyerAccountError && caught.status === 401) {
         await expireBuyerSession();

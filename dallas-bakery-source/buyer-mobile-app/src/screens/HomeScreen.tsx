@@ -83,7 +83,7 @@ export function HomeScreen({
 
         <View style={styles.stats}>
           <View style={styles.stat}><Text style={styles.statValue}>{account.orders.length}</Text><Text style={styles.statLabel}>RECENT ORDERS</Text></View>
-          <View style={styles.stat}><Text style={styles.statValue}>{shipping.formattedRate}</Text><Text style={styles.statLabel}>PER {shipping.unitsPerBox}-LOAF BOX</Text></View>
+          <View style={styles.stat}><Text style={styles.statValue}>{shipping.formattedRate || "—"}</Text><Text style={styles.statLabel}>PER {shipping.unitsPerBox}-LOAF BOX</Text></View>
           <View style={styles.stat}><Text style={styles.statValue}>{locations.length}</Text><Text style={styles.statLabel}>APPROVED LOCATIONS</Text></View>
         </View>
 

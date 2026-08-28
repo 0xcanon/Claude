@@ -280,7 +280,7 @@ export default async function Home() {
           </details>
           <details>
             <summary>How is shipping calculated?<span>+</span></summary>
-            <p>Shipping is {shipping.formattedRate} per case — each case ships as its own box of {shipping.unitsPerBox} loaves. Three cases is three boxes at {shipping.formattedRate} each, and the total appears before you pay. Shipping is billed separately from case pricing.</p>
+            <p>Shipping is billed per case — each case ships as its own box of {shipping.unitsPerBox} loaves, so three cases arrive as three boxes. Your account shows the exact rate and the full total before you pay. Shipping is billed separately from case pricing.</p>
           </details>
           <details>
             <summary>What are the shelf life and production capacity?<span>+</span></summary>

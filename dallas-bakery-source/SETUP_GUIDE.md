@@ -131,7 +131,9 @@ Everything happens at `https://dallasbakery.net/admin`:
 - **Shipping queue** — tick orders → Create labels → Print (thermal printer)
   → Mark shipped (buyers get tracking automatically). Refund a not-yet-shipped
   order from its row.
-- **Case shipping** — the per-case shipping price buyers pay.
+- **Case shipping** — the per-case shipping price buyers pay. Like every
+  price, it shows only inside a signed-in buyer account — the public pages
+  and the app's welcome screen never display a dollar figure.
 - **Credit terms** — when you approve an account you'll be asked whether to
   give it a credit limit (you can also change it any time on the approved
   card). A buyer with credit sees an extra **"Order on account — no card"**
