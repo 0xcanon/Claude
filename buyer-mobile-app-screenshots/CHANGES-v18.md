@@ -95,6 +95,15 @@ feature:
 - **Refunded orders on the website** — the pill, the plain statement instead
   of a progress tracker, and no tracking link, matching the app.
 
+## Parcel weight confirmed: 27 lb
+
+The packed-box weight UPS bills on is no longer a "weigh me" placeholder: the
+owner confirmed a packed box weighs **27 lb**, which is exactly the stored
+432 oz, and every label sends UPS 27 lb. The weight is now also editable in
+`/admin` under Live order settings (entered in pounds, 1–150 lb, validated
+server-side), so a future packing change never needs a deploy. Old admin
+clients that don't send the field can't reset it.
+
 ## Deliberately not in this release
 
 Push notifications. They need APNs/FCM credentials and a store build to test
