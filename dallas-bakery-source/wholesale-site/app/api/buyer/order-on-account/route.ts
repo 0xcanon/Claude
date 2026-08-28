@@ -9,9 +9,10 @@
  * for — and the response carries the recorded order in the same shape the
  * order-status endpoint returns, so confirmation screens need no polling.
  *
- * Two simultaneous orders could each pass the credit check before the other
- * records; for a bakery whose buyers order once a day that window is
- * accepted, and the owner sees every account order in /admin either way.
+ * The balance can NEVER pass the limit. Two simultaneous orders could each
+ * pass the credit check before the other records, so after recording, the
+ * balance is re-checked — an order that pushed it past the limit is removed
+ * again and refused, exactly as if the check had caught it up front.
  */
 
 import { eq } from "drizzle-orm";
@@ -21,7 +22,7 @@ import { orders } from "../../../../db/schema";
 import { BuyerAuthError, requireBuyer } from "../../../buyer-auth.ts";
 import { creditStateFor } from "../../../buyer-credit.ts";
 import { resolveDeliveryLocation } from "../../../buyer-locations.ts";
-import { assessAccountOrder } from "../../../credit-terms.ts";
+import { assessAccountOrder, overLimitMessage } from "../../../credit-terms.ts";
 import { priceOverridesFor } from "../../../customer-pricing.ts";
 import {
   buyerOrderConfirmationEmail,
@@ -94,6 +95,18 @@ export async function POST(request: Request) {
       applicationId: buyer.applicationId,
       paymentTerms: "account",
     });
+
+    // The hard guarantee: re-check the balance now that this order is in.
+    // If a simultaneous order slipped in between the check above and the
+    // insert, the balance could have passed the limit — in that case this
+    // order is removed again and refused, so the account never owes more
+    // than its limit.
+    const afterRecording = await creditStateFor(buyer.applicationId);
+    if (afterRecording.outstandingCents > afterRecording.limitCents) {
+      await getDb().delete(orders).where(eq(orders.id, result.id));
+      const credit = await creditStateFor(buyer.applicationId);
+      return Response.json({ error: overLimitMessage(credit), credit }, { status: 400 });
+    }
 
     const emailDetails = {
       channel: "wholesale",

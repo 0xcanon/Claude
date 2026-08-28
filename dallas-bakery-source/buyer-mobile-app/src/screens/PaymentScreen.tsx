@@ -145,7 +145,9 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
             />
             {credit?.enabled && onOrderOnAccount && summary.totalCents > credit.availableCents && (
               <Text style={styles.accountShort}>
-                This order is over your available credit ({money(credit.availableCents)} left), so it needs a card — or settle an open invoice first.
+                {credit.outstandingCents > 0
+                  ? `This order is over your available credit (${money(credit.availableCents)} left). Pay your open invoice balance (${money(credit.outstandingCents)}) to free up credit, or pay this order by card.`
+                  : `This order is over your ${money(credit.limitCents)} credit limit, so it needs a card — or place a smaller order on account.`}
               </Text>
             )}
           </>

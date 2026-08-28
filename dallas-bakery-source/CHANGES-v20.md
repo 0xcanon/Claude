@@ -3,8 +3,8 @@
 Everything in this round was verified live against a seeded local site:
 account orders placed and recorded, over-limit orders refused with the right
 amount, invoices marked paid, account orders cancelled, credit limits and
-exclusive prices set and cleared from /admin — plus 81 automated tests
-(69 site, 9 buyer app, 3 owner app), lint, typecheck, and a production build.
+exclusive prices set and cleared from /admin — plus 84 automated tests
+(72 site, 9 buyer app, 3 owner app), lint, typecheck, and a production build.
 
 ## Credit terms (order on account)
 
@@ -25,8 +25,11 @@ exclusive prices set and cleared from /admin — plus 81 automated tests
   credit, and records the order immediately with `payment_terms='account'`
   — no Stripe object exists for it. The response carries the recorded
   order, so confirmation screens show the order number instantly with no
-  webhook polling. An order over the available credit is refused with the
-  exact amount left; the refusal is a 400, never a session-expiry code.
+  webhook polling. The balance can never pass the limit: an order over the
+  available credit is refused with the exact amount left and told the way
+  forward (pay the open invoice balance, or pay by card), and a re-check
+  after recording removes an order that a simultaneous request would have
+  pushed past the limit. The refusal is a 400, never a session-expiry code.
 - **Outstanding balance.** Unpaid account orders (not refunded, invoice not
   marked paid) sum into the buyer's outstanding balance; available credit is
   limit minus outstanding, floored at zero. Pure arithmetic lives in
@@ -83,7 +86,7 @@ exclusive prices set and cleared from /admin — plus 81 automated tests
 
 ## Numbers
 
-- Tests: 69 site + 9 buyer app + 3 owner app, all green.
+- Tests: 72 site + 9 buyer app + 3 owner app, all green.
 - No client ever sends money amounts; credit checks and exclusive prices are
   entirely server-side, so a patched app can neither change a price nor
   exceed its credit line.

@@ -32,9 +32,15 @@ export function computeCreditState(limitCents: number, outstandingCents: number)
   };
 }
 
+function dollars(cents: number) {
+  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
 /**
- * Decides whether one more order fits the credit line. Messages are written
- * for the buyer — they show verbatim at checkout.
+ * Decides whether one more order fits the credit line. The account can never
+ * go past its limit: an order that doesn't fit is refused, and the message
+ * tells the buyer the way forward — pay an open invoice when they have one,
+ * otherwise pay this order by card. Messages show verbatim at checkout.
  */
 export function assessAccountOrder(
   state: CreditState,
@@ -47,13 +53,22 @@ export function assessAccountOrder(
     return { ok: false, error: "That order can't be placed on account." };
   }
   if (orderTotalCents > state.availableCents) {
-    const available = (state.availableCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-    return {
-      ok: false,
-      error: `This order is over your available credit (${available} left). Pay by card, or settle an open invoice first.`,
-    };
+    return { ok: false, error: overLimitMessage(state) };
   }
   return { ok: true };
+}
+
+/**
+ * The buyer-facing explanation when an order doesn't fit the credit line:
+ * with open invoices, paying one frees credit; without any, the order is
+ * simply bigger than the limit and card is the way.
+ */
+export function overLimitMessage(state: CreditState): string {
+  if (state.outstandingCents > 0) {
+    return `This order is over your available credit (${dollars(state.availableCents)} left). ` +
+      `Pay your open invoice balance (${dollars(state.outstandingCents)}) to free up credit, or pay this order by card.`;
+  }
+  return `This order is over your ${dollars(state.limitCents)} credit limit. Pay it by card, or place a smaller order on account.`;
 }
 
 /**

@@ -144,8 +144,10 @@ Everything happens at `https://dallasbakery.net/admin`:
   **ON ACCOUNT**, nothing is charged to a card, and you invoice them however
   you normally do. When they pay you, open the order in
   the queue and press **Mark invoice paid** — that frees up their credit for
-  the next order. Unpaid account orders always count against the limit, and an
-  order that would go over it is politely refused at checkout. Cancelling an
+  the next order. Unpaid account orders always count against the limit, and the
+  account can never owe more than its limit: an order that would go over is
+  refused at checkout and pointed the right way — pay the open invoice
+  balance to free up credit, or pay that order by card. Cancelling an
   un-shipped account order releases its amount instantly (no Stripe involved,
   since no card was charged).
 - **Exclusive pricing** — on any approved buyer's card, open **Exclusive

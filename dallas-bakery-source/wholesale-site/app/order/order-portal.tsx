@@ -632,7 +632,9 @@ export function OrderPortal() {
               </button>
               {credit?.enabled && caseCount > 0 && subtotalCents + shippingCents > credit.availableCents && (
                 <small className="buyer-credit-short">
-                  This order is over your available credit ({money(credit.availableCents)} left), so it needs a card — or settle an open invoice first.
+                  {credit.outstandingCents > 0
+                    ? `This order is over your available credit (${money(credit.availableCents)} left). Pay your open invoice balance (${money(credit.outstandingCents)}) to free up credit, or pay this order by card.`
+                    : `This order is over your ${money(credit.limitCents)} credit limit, so it needs a card — or place a smaller order on account.`}
                 </small>
               )}
             </>
