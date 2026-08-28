@@ -1,0 +1,542 @@
+--- a/buyer-mobile-app/App.tsx
++++ b/buyer-mobile-app/App.tsx
+@@ -515,6 +515,7 @@
+         onRefresh={() => void refreshAccount()}
+         onSelectLocation={selectLocation}
+         onTab={selectTab}
++        products={products}
+         selectedLocationId={selectedLocationId}
+         shipping={shipping}
+       />
+--- a/buyer-mobile-app/src/types.ts
++++ b/buyer-mobile-app/src/types.ts
+@@ -95,8 +95,12 @@
+   id: string;
+   title: string;
+   availableForSale: boolean;
++  /** Price of one CASE, not one loaf. The server is the price authority. */
+   price: { amount: string; currencyCode: string };
++  /** Quantity rules are counted in cases. */
+   quantityRule: QuantityRule;
++  /** Loaves in a case. Sent by the server; falls back to LOAVES_PER_CASE. */
++  unitsPerCase?: number;
+ };
+ 
+ export type CatalogProduct = {
+--- a/buyer-mobile-app/src/lib/format.ts
++++ b/buyer-mobile-app/src/lib/format.ts
+@@ -1,5 +1,13 @@
+ import type { CatalogProduct, CartQuantityMap, ShippingSettings } from "../types";
+ 
++/**
++ * Wholesale is sold by the case, never the loaf. Cart quantities, quantity
++ * rules, and the case counts sent to checkout are all counted in CASES;
++ * loaves only ever appear as display copy and in the shipping estimate,
++ * which bills per box of loaves.
++ */
++export const LOAVES_PER_CASE = 25;
++
+ export function formatMoney(amount: string | number, currencyCode = "USD") {
+   const value = typeof amount === "number" ? amount : Number(amount);
+   return new Intl.NumberFormat("en-US", {
+@@ -30,19 +38,57 @@
+     .join(" · ");
+ }
+ 
++/** Loaves in one case of this product. */
++export function loavesPerCase(product: CatalogProduct) {
++  const declared = Number(product.variant.unitsPerCase);
++  return Number.isFinite(declared) && declared > 0 ? Math.floor(declared) : LOAVES_PER_CASE;
++}
++
++/** Price of a single loaf, derived from the case price the server sends. */
++export function loafPrice(product: CatalogProduct) {
++  return Number(product.variant.price.amount) / loavesPerCase(product);
++}
++
++/** "1 case" / "3 cases" — the unit buyers actually order in. */
++export function caseLabel(cases: number) {
++  return `${cases} ${cases === 1 ? "case" : "cases"}`;
++}
++
++/** "50 loaves" — the plain-English size behind a case count. */
++export function loafLabel(loaves: number) {
++  return `${loaves} ${loaves === 1 ? "loaf" : "loaves"}`;
++}
++
++/** Total CASES in the cart. */
+ export function cartQuantity(cart: CartQuantityMap) {
+   return Object.values(cart).reduce((total, quantity) => total + Math.max(0, quantity || 0), 0);
+ }
+ 
++/**
++ * Total LOAVES in the cart. Shipping bills per box of loaves, so this — not
++ * the case count — is what the shipping estimate must be given.
++ */
++export function cartLoaves(products: CatalogProduct[], cart: CartQuantityMap) {
++  return products.reduce((total, product) => (
++    total + loavesPerCase(product) * Math.max(0, cart[product.variant.id] || 0)
++  ), 0);
++}
++
++/** Cart subtotal: case price times case count, per line. */
+ export function cartSubtotal(products: CatalogProduct[], cart: CartQuantityMap) {
+   return products.reduce((total, product) => (
+     total + Number(product.variant.price.amount) * (cart[product.variant.id] || 0)
+   ), 0);
+ }
+ 
+-export function shippingEstimate(quantity: number, settings: ShippingSettings) {
+-  if (quantity <= 0) return { boxes: 0, cents: 0 };
+-  const boxes = Math.ceil(quantity / Math.max(1, settings.unitsPerBox));
++/**
++ * Boxes and cost for a number of LOAVES. Passing a case count here silently
++ * under-bills shipping by the case size, so callers convert first with
++ * cartLoaves.
++ */
++export function shippingEstimate(loaves: number, settings: ShippingSettings) {
++  if (loaves <= 0) return { boxes: 0, cents: 0 };
++  const boxes = Math.ceil(loaves / Math.max(1, settings.unitsPerBox));
+   return { boxes, cents: boxes * Math.max(0, settings.rateCents) };
+ }
+ 
+--- a/buyer-mobile-app/src/components/ProductCard.tsx
++++ b/buyer-mobile-app/src/components/ProductCard.tsx
+@@ -1,6 +1,6 @@
+ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+ 
+-import { formatMoney } from "../lib/format";
++import { formatMoney, loafPrice, loavesPerCase } from "../lib/format";
+ import { colors, fonts, shadow } from "../theme";
+ import type { CatalogProduct } from "../types";
+ 
+@@ -14,6 +14,8 @@
+ const fallbackImage = require("../../assets/barbari-product.jpg");
+ 
+ export function ProductCard({ product, quantity, onAdd, onOpen }: Props) {
++  const currency = product.variant.price.currencyCode;
++  const perCase = loavesPerCase(product);
+   return (
+     <Pressable accessibilityRole="button" onPress={onOpen} style={styles.card}>
+       <Image
+@@ -27,8 +29,8 @@
+         <Text numberOfLines={1} style={styles.title}>{product.title}</Text>
+         <Text numberOfLines={1} style={styles.description}>{product.description || "Persian flatbread"}</Text>
+         <View style={styles.priceRow}>
+-          <Text style={styles.price}>{formatMoney(product.variant.price.amount, product.variant.price.currencyCode)}</Text>
+-          <Text style={styles.unit}> each</Text>
++          <Text style={styles.price}>{formatMoney(product.variant.price.amount, currency)}</Text>
++          <Text style={styles.unit}> per case</Text>
+           <Pressable
+             accessibilityLabel={`Add ${product.title}`}
+             disabled={!product.variant.availableForSale}
+@@ -39,6 +41,7 @@
+             <Text style={styles.addText}>{quantity > 0 ? quantity : "+"}</Text>
+           </Pressable>
+         </View>
++        <Text style={styles.caseNote}>{perCase} LOAVES · {formatMoney(loafPrice(product), currency)} EACH</Text>
+         <Text style={styles.shelf}>14-DAY SHELF LIFE</Text>
+       </View>
+     </Pressable>
+@@ -58,5 +61,6 @@
+   unit: { color: colors.muted, fontFamily: fonts.sans, fontSize: 7 },
+   add: { marginLeft: "auto", width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: 15, backgroundColor: colors.rust },
+   addText: { color: colors.paper, fontFamily: fonts.sansMedium, fontSize: 13 },
+-  shelf: { marginTop: 8, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 6, letterSpacing: 0.65 },
++  caseNote: { marginTop: 7, color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 6.5, letterSpacing: 0.5 },
++  shelf: { marginTop: 4, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 6, letterSpacing: 0.65 },
+ });
+--- a/buyer-mobile-app/src/screens/ProductDetailScreen.tsx
++++ b/buyer-mobile-app/src/screens/ProductDetailScreen.tsx
+@@ -3,7 +3,7 @@
+ 
+ import { BrandLockup } from "../components/BrandLockup";
+ import { PrimaryButton } from "../components/PrimaryButton";
+-import { formatMoney, normalizeQuantity } from "../lib/format";
++import { caseLabel, formatMoney, loafLabel, loafPrice, loavesPerCase, normalizeQuantity } from "../lib/format";
+ import { colors, fonts } from "../theme";
+ import type { BuyerLocation, CatalogProduct } from "../types";
+ 
+@@ -19,12 +19,15 @@
+ 
+ export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQuantity, product }: Props) {
+   const rule = product.variant.quantityRule;
++  // `quantity` is a number of CASES throughout this screen.
+   const [quantity, setQuantity] = useState(initialQuantity || rule.minimum);
+   const increment = rule.increment || 1;
+   function change(next: number) {
+     const normalized = normalizeQuantity(next, rule.minimum, increment);
+     setQuantity(rule.maximum ? Math.min(normalized, rule.maximum) : normalized);
+   }
++  const currency = product.variant.price.currencyCode;
++  const perCase = loavesPerCase(product);
+   const subtotal = Number(product.variant.price.amount) * quantity;
+   return (
+     <SafeAreaView style={styles.safe}>
+@@ -39,18 +42,21 @@
+         <Text style={styles.title}>{product.title}</Text>
+         <Text style={styles.description}>{product.description || "Traditional Persian Barbari flatbread with a 14-day shelf life."}</Text>
+         <View style={styles.priceRow}>
+-          <Text style={styles.price}>{formatMoney(product.variant.price.amount, product.variant.price.currencyCode)}</Text>
+-          <Text style={styles.unit}> per bread</Text>
++          <Text style={styles.price}>{formatMoney(product.variant.price.amount, currency)}</Text>
++          <Text style={styles.unit}> per case</Text>
+         </View>
++        <Text style={styles.caseBreakdown}>
++          One case is {loafLabel(perCase)} — {formatMoney(loafPrice(product), currency)} a loaf.
++        </Text>
+ 
+         <View style={styles.divider} />
+         <View style={styles.controls}>
+           <View style={styles.controlBlock}>
+-            <Text style={styles.label}>QUANTITY</Text>
++            <Text style={styles.label}>CASES</Text>
+             <View style={styles.stepper}>
+-              <Pressable accessibilityLabel="Decrease quantity" onPress={() => change(Math.max(0, quantity - increment))}><Text style={styles.step}>−</Text></Pressable>
++              <Pressable accessibilityLabel="One fewer case" onPress={() => change(Math.max(0, quantity - increment))}><Text style={styles.step}>−</Text></Pressable>
+               <Text style={styles.quantity}>{quantity}</Text>
+-              <Pressable accessibilityLabel="Increase quantity" onPress={() => change(quantity + increment)}><Text style={styles.step}>+</Text></Pressable>
++              <Pressable accessibilityLabel="One more case" onPress={() => change(quantity + increment)}><Text style={styles.step}>+</Text></Pressable>
+             </View>
+           </View>
+           <View style={styles.controlBlock}>
+@@ -58,7 +64,10 @@
+             <View style={styles.orderType}><Text style={styles.orderTypeText}>Wholesale order</Text></View>
+           </View>
+         </View>
+-        <Text style={styles.ruleText}>Minimum {rule.minimum}; add in increments of {increment}{rule.maximum ? `; maximum ${rule.maximum}` : ""}.</Text>
++        <Text style={styles.ruleText}>
++          {quantity > 0 ? `${caseLabel(quantity)} · ${loafLabel(quantity * perCase)}. ` : ""}
++          Minimum {caseLabel(rule.minimum)}{rule.maximum ? `, maximum ${caseLabel(rule.maximum)}` : ""}.
++        </Text>
+ 
+         <View style={styles.delivery}>
+           <Text style={styles.label}>DELIVER TO</Text>
+@@ -66,8 +75,8 @@
+           <Text style={styles.deliveryText}>{location?.companyName || "Location setup is still underway."}</Text>
+         </View>
+ 
+-        <View style={styles.subtotalRow}><Text style={styles.subtotalLabel}>ORDER SUBTOTAL</Text><Text style={styles.subtotal}>{formatMoney(subtotal, product.variant.price.currencyCode)}</Text></View>
+-        <PrimaryButton label={`${initialQuantity ? "UPDATE" : "ADD"} ${quantity} TO CART`} onPress={() => { onSetQuantity(quantity); onBack(); }} />
++        <View style={styles.subtotalRow}><Text style={styles.subtotalLabel}>ORDER SUBTOTAL</Text><Text style={styles.subtotal}>{formatMoney(subtotal, currency)}</Text></View>
++        <PrimaryButton label={`${initialQuantity ? "UPDATE" : "ADD"} ${caseLabel(quantity).toUpperCase()}`} onPress={() => { onSetQuantity(quantity); onBack(); }} />
+       </ScrollView>
+     </SafeAreaView>
+   );
+@@ -86,6 +95,7 @@
+   priceRow: { marginTop: 14, flexDirection: "row", alignItems: "baseline" },
+   price: { color: colors.rust, fontFamily: fonts.serif, fontWeight: "700", fontSize: 27 },
+   unit: { color: colors.muted, fontFamily: fonts.sans, fontSize: 9 },
++  caseBreakdown: { marginTop: 6, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, lineHeight: 16 },
+   divider: { height: 1, marginVertical: 18, backgroundColor: colors.line },
+   controls: { flexDirection: "row", gap: 10 },
+   controlBlock: { flex: 1 },
+--- a/buyer-mobile-app/src/screens/CartScreen.tsx
++++ b/buyer-mobile-app/src/screens/CartScreen.tsx
+@@ -3,7 +3,7 @@
+ import { BrandLockup } from "../components/BrandLockup";
+ import { LocationSelector } from "../components/LocationSelector";
+ import { PrimaryButton } from "../components/PrimaryButton";
+-import { cartQuantity, cartSubtotal, formatMoney, shippingEstimate } from "../lib/format";
++import { caseLabel, cartLoaves, cartQuantity, cartSubtotal, formatMoney, loafLabel, loavesPerCase, shippingEstimate } from "../lib/format";
+ import { colors, fonts } from "../theme";
+ import type { BuyerLocation, CatalogProduct, CartQuantityMap, ShippingSettings } from "../types";
+ 
+@@ -37,7 +37,10 @@
+   const cartProducts = products.filter((product) => (cart[product.variant.id] || 0) > 0);
+   const quantity = cartQuantity(cart);
+   const subtotal = cartSubtotal(products, cart);
+-  const estimate = shippingEstimate(quantity, shipping);
++  // Shipping bills per box of LOAVES, so the estimate takes the loaf count.
++  // Handing it the case count under-bills by the size of a case.
++  const loaves = cartLoaves(products, cart);
++  const estimate = shippingEstimate(loaves, shipping);
+   const currency = cartProducts[0]?.variant.price.currencyCode || "USD";
+   return (
+     <SafeAreaView style={styles.safe}>
+@@ -61,19 +64,22 @@
+               <View key={product.id} style={styles.lineItem}>
+                 <View style={styles.lineCopy}>
+                   <Text style={styles.lineTitle}>{product.title}</Text>
+-                  <Text style={styles.lineDetail}>{lineQuantity} × {formatMoney(product.variant.price.amount, product.variant.price.currencyCode)}</Text>
++                  <Text style={styles.lineDetail}>
++                    {caseLabel(lineQuantity)} × {formatMoney(product.variant.price.amount, product.variant.price.currencyCode)}
++                  </Text>
++                  <Text style={styles.lineLoaves}>{loafLabel(lineQuantity * loavesPerCase(product))}</Text>
+                 </View>
+                 <View style={styles.lineActions}>
+-                  <Pressable onPress={() => onQuantity(product, Math.max(0, lineQuantity - increment))}><Text style={styles.adjust}>−</Text></Pressable>
++                  <Pressable accessibilityLabel={`One fewer case of ${product.title}`} onPress={() => onQuantity(product, Math.max(0, lineQuantity - increment))}><Text style={styles.adjust}>−</Text></Pressable>
+                   <Text style={styles.lineTotal}>{formatMoney(Number(product.variant.price.amount) * lineQuantity, product.variant.price.currencyCode)}</Text>
+-                  <Pressable onPress={() => onQuantity(product, lineQuantity + increment)}><Text style={styles.adjust}>+</Text></Pressable>
++                  <Pressable accessibilityLabel={`One more case of ${product.title}`} onPress={() => onQuantity(product, lineQuantity + increment)}><Text style={styles.adjust}>+</Text></Pressable>
+                 </View>
+               </View>
+             );
+           }) : <Text style={styles.empty}>Your cart is empty.</Text>}
+ 
+           <View style={styles.totals}>
+-            <View style={styles.totalRow}><Text style={styles.totalLabel}>Subtotal</Text><Text style={styles.totalValue}>{formatMoney(subtotal, currency)}</Text></View>
++            <View style={styles.totalRow}><Text style={styles.totalLabel}>Subtotal · {caseLabel(quantity)}</Text><Text style={styles.totalValue}>{formatMoney(subtotal, currency)}</Text></View>
+             <View style={styles.totalRow}><Text style={styles.totalLabel}>Box shipping · {estimate.boxes} {estimate.boxes === 1 ? "box" : "boxes"}</Text><Text style={styles.totalValue}>{formatMoney(estimate.cents / 100, currency)}</Text></View>
+             <View style={[styles.totalRow, styles.grandRow]}><Text style={styles.grandLabel}>Estimated total</Text><Text style={styles.grandValue}>{formatMoney(subtotal + estimate.cents / 100, currency)}</Text></View>
+           </View>
+@@ -81,7 +87,7 @@
+ 
+         <View style={styles.shippingNote}>
+           <Text style={styles.shippingKicker}>LIVE BOX SHIPPING</Text>
+-          <Text style={styles.shippingText}>{shipping.formattedRate} for each box of up to {shipping.unitsPerBox} units. Tax and final checkout adjustments appear securely before payment.</Text>
++          <Text style={styles.shippingText}>{shipping.formattedRate} for each box of up to {shipping.unitsPerBox} loaves — {loafLabel(loaves)} needs {estimate.boxes} {estimate.boxes === 1 ? "box" : "boxes"}. Tax and final checkout adjustments appear securely before payment.</Text>
+         </View>
+         {!!checkoutError && <Text style={styles.error}>{checkoutError}</Text>}
+         <PrimaryButton disabled={!quantity || !selectedLocationId} label="CONTINUE SECURELY" loading={checkingOut} onPress={onCheckout} />
+@@ -106,6 +112,7 @@
+   lineCopy: { flex: 1 },
+   lineTitle: { color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 11 },
+   lineDetail: { marginTop: 5, color: colors.muted, fontFamily: fonts.sans, fontSize: 9 },
++  lineLoaves: { marginTop: 3, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 7.5, letterSpacing: 0.4 },
+   lineActions: { flexDirection: "row", alignItems: "center", gap: 9 },
+   adjust: { width: 25, color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 19, textAlign: "center" },
+   lineTotal: { minWidth: 62, color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 11, textAlign: "center" },
+--- a/buyer-mobile-app/src/screens/CatalogScreen.tsx
++++ b/buyer-mobile-app/src/screens/CatalogScreen.tsx
+@@ -6,6 +6,7 @@
+ import { LocationSelector } from "../components/LocationSelector";
+ import { PrimaryButton } from "../components/PrimaryButton";
+ import { ProductCard } from "../components/ProductCard";
++import { caseLabel } from "../lib/format";
+ import { colors, fonts } from "../theme";
+ import type { BuyerLocation, CatalogProduct, CartQuantityMap, MainTab } from "../types";
+ 
+@@ -56,7 +57,7 @@
+         </View>
+         <Text style={styles.greeting}>Private pricing for your business.</Text>
+         <Text style={styles.title}>Wholesale catalog</Text>
+-        <Text style={styles.description}>Prices and quantity rules are loaded only for the selected approved storefront.</Text>
++        <Text style={styles.description}>Sold by the case. Prices are loaded only for the selected approved storefront.</Text>
+ 
+         <View style={styles.locationArea}>
+           <LocationSelector compact locations={locations} onSelect={onSelectLocation} selectedId={selectedLocationId} />
+@@ -97,7 +98,7 @@
+           <Text style={styles.capacityKicker}>UNLIMITED WEEKLY CAPACITY</Text>
+           <Text style={styles.capacityText}>Need a recurring order? Dallas Bakery can support it.</Text>
+         </View>
+-        {cartCount > 0 && <PrimaryButton label={`VIEW CART · ${cartCount} ITEMS`} onPress={onCart} />}
++        {cartCount > 0 && <PrimaryButton label={`VIEW CART · ${caseLabel(cartCount).toUpperCase()}`} onPress={onCart} />}
+       </ScrollView>
+       <BottomNav active="catalog" cartCount={cartCount} onSelect={onTab} />
+     </SafeAreaView>
+--- a/buyer-mobile-app/src/screens/HomeScreen.tsx
++++ b/buyer-mobile-app/src/screens/HomeScreen.tsx
+@@ -4,9 +4,9 @@
+ import { BottomNav } from "../components/BottomNav";
+ import { LocationSelector } from "../components/LocationSelector";
+ import { PrimaryButton } from "../components/PrimaryButton";
+-import { formatLocationAddress } from "../lib/format";
++import { formatLocationAddress, formatMoney } from "../lib/format";
+ import { colors, fonts } from "../theme";
+-import type { BuyerAccount, BuyerLocation, MainTab, ShippingSettings } from "../types";
++import type { BuyerAccount, BuyerLocation, CatalogProduct, MainTab, ShippingSettings } from "../types";
+ 
+ type Props = {
+   account: BuyerAccount;
+@@ -17,6 +17,7 @@
+   onRefresh: () => void;
+   onSelectLocation: (id: string) => void;
+   onTab: (tab: MainTab) => void;
++  products: CatalogProduct[];
+   selectedLocationId: string;
+   shipping: ShippingSettings;
+ };
+@@ -30,10 +31,18 @@
+   onRefresh,
+   onSelectLocation,
+   onTab,
++  products,
+   selectedLocationId,
+   shipping,
+ }: Props) {
+   const selected = locations.find((location) => location.id === selectedLocationId) || locations[0];
++  // Cheapest case in the buyer's own catalog, so the headline price is real
++  // rather than a number baked into the app.
++  const casePrices = products.map((product) => Number(product.variant.price.amount)).filter(Number.isFinite);
++  const fromPrice = casePrices.length ? Math.min(...casePrices) : null;
++  // Cases are not all one price, so the cheapest one is labelled as a "from".
++  const mixedPricing = new Set(casePrices).size > 1;
++  const currency = products[0]?.variant.price.currencyCode || "USD";
+   const initials = `${account.firstName[0] || ""}${account.lastName[0] || ""}`.toUpperCase();
+   return (
+     <SafeAreaView style={styles.safe}>
+@@ -60,15 +69,21 @@
+               <Text style={styles.orderKicker}>PRIVATE WHOLESALE CATALOG</Text>
+               <Text style={styles.orderTitle}>Fresh bread for busy kitchens.</Text>
+             </View>
+-            <Text style={styles.price}>$2.50</Text>
++            {fromPrice !== null && (
++              <View style={styles.priceBlock}>
++                {mixedPricing && <Text style={styles.priceFrom}>FROM</Text>}
++                <Text style={styles.price}>{formatMoney(fromPrice, currency)}</Text>
++                <Text style={styles.priceUnit}>PER CASE</Text>
++              </View>
++            )}
+           </View>
+-          <Text style={styles.orderText}>Catalog pricing is loaded securely for {selected?.name || "your approved location"}.</Text>
++          <Text style={styles.orderText}>Sold by the case, loaded securely for {selected?.name || "your approved location"}.</Text>
+           <PrimaryButton disabled={!selected} label="BROWSE BREAD" onPress={() => onTab("catalog")} />
+         </View>
+ 
+         <View style={styles.stats}>
+           <View style={styles.stat}><Text style={styles.statValue}>{account.orders.length}</Text><Text style={styles.statLabel}>RECENT ORDERS</Text></View>
+-          <View style={styles.stat}><Text style={styles.statValue}>{shipping.formattedRate}</Text><Text style={styles.statLabel}>PER {shipping.unitsPerBox}-UNIT BOX</Text></View>
++          <View style={styles.stat}><Text style={styles.statValue}>{shipping.formattedRate}</Text><Text style={styles.statLabel}>PER {shipping.unitsPerBox}-LOAF BOX</Text></View>
+           <View style={styles.stat}><Text style={styles.statValue}>{locations.length}</Text><Text style={styles.statLabel}>APPROVED LOCATIONS</Text></View>
+         </View>
+ 
+@@ -104,7 +119,10 @@
+   orderCardTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+   orderKicker: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 7, letterSpacing: 1 },
+   orderTitle: { marginTop: 7, maxWidth: 220, color: colors.chocolate, fontFamily: fonts.serif, fontSize: 23, lineHeight: 27 },
++  priceBlock: { alignItems: "flex-end" },
++  priceFrom: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 6, letterSpacing: 0.7 },
+   price: { color: colors.rust, fontFamily: fonts.serif, fontWeight: "700", fontSize: 24 },
++  priceUnit: { marginTop: 2, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 6, letterSpacing: 0.7 },
+   orderText: { marginTop: 9, marginBottom: 15, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, lineHeight: 16 },
+   stats: { marginTop: 14, flexDirection: "row", gap: 7 },
+   stat: { flex: 1, minHeight: 80, padding: 10, justifyContent: "space-between", borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
+--- a/buyer-mobile-app/src/screens/WelcomeScreen.tsx
++++ b/buyer-mobile-app/src/screens/WelcomeScreen.tsx
+@@ -48,15 +48,15 @@
+ 
+         <Text style={styles.sectionKicker}>BUILT FOR YOUR BUSINESS</Text>
+         <View style={styles.facts}>
+-          <View style={styles.fact}><Text style={styles.factValue}>14 days</Text><Text style={styles.factLabel}>SHELF LIFE</Text></View>
++          <View style={styles.fact}><Text style={styles.factValue}>Cases of 25</Text><Text style={styles.factLabel}>ONE CASE MINIMUM</Text></View>
+           <View style={styles.fact}><Text style={styles.factValue}>Kosher + Halal</Text><Text style={styles.factLabel}>CERTIFIED</Text></View>
+-          <View style={styles.fact}><Text style={styles.factValue}>Unlimited</Text><Text style={styles.factLabel}>WEEKLY CAPACITY</Text></View>
++          <View style={styles.fact}><Text style={styles.factValue}>14 days</Text><Text style={styles.factLabel}>SHELF LIFE</Text></View>
+         </View>
+ 
+         <View style={styles.shippingCard}>
+           <Text style={styles.shippingKicker}>SIMPLE BOX SHIPPING</Text>
+           <Text style={styles.shippingTitle}>{shipping.formattedRate} per box</Text>
+-          <Text style={styles.shippingText}>Each box holds up to {shipping.unitsPerBox} breads. Partial boxes count as a full box.</Text>
++          <Text style={styles.shippingText}>Bread is ordered by the case. Each box holds up to {shipping.unitsPerBox} breads, and partial boxes count as a full box.</Text>
+         </View>
+ 
+         <Text onPress={() => void Linking.openURL("mailto:sales@dallasbakery.com")} style={styles.help}>
+--- a/buyer-mobile-app/tests/format.test.ts
++++ b/buyer-mobile-app/tests/format.test.ts
+@@ -2,10 +2,17 @@
+ import test from "node:test";
+ 
+ import {
++  cartLoaves,
+   cartQuantity,
++  cartSubtotal,
++  caseLabel,
++  loafLabel,
++  loafPrice,
++  loavesPerCase,
+   normalizeQuantity,
+   shippingEstimate,
+ } from "../src/lib/format.ts";
++import type { CatalogProduct } from "../src/types.ts";
+ 
+ const shipping = {
+   rateCents: 1250,
+@@ -13,6 +20,26 @@
+   formattedRate: "$12.50",
+ };
+ 
++/** A case product shaped the way /api/buyer/catalog sends it. */
++function caseProduct(sku: string, casePrice: string, unitsPerCase = 25): CatalogProduct {
++  return {
++    id: sku,
++    handle: sku.toLowerCase(),
++    title: `${sku} — Case of ${unitsPerCase}`,
++    description: "",
++    imageUrl: "",
++    imageAlt: "",
++    variant: {
++      id: sku,
++      title: `Case of ${unitsPerCase}`,
++      availableForSale: true,
++      price: { amount: casePrice, currencyCode: "USD" },
++      quantityRule: { minimum: 1, maximum: null, increment: 1 },
++      unitsPerCase,
++    },
++  };
++}
++
+ test("buyer shipping estimate uses the same partial-box rule", () => {
+   assert.deepEqual(shippingEstimate(1, shipping), { boxes: 1, cents: 1250 });
+   assert.deepEqual(shippingEstimate(25, shipping), { boxes: 1, cents: 1250 });
+@@ -20,8 +47,8 @@
+   assert.deepEqual(shippingEstimate(51, shipping), { boxes: 3, cents: 3750 });
+ });
+ 
+-test("cart quantity ignores empty or negative lines", () => {
+-  assert.equal(cartQuantity({ a: 25, b: 10, c: -5, d: 0 }), 35);
++test("cart quantity counts cases and ignores empty or negative lines", () => {
++  assert.equal(cartQuantity({ a: 2, b: 1, c: -5, d: 0 }), 3);
+ });
+ 
+ test("quantity changes respect minimums and increments", () => {
+@@ -29,3 +56,47 @@
+   assert.equal(normalizeQuantity(11, 10, 5), 15);
+   assert.equal(normalizeQuantity(0, 10, 5), 0);
+ });
++
++test("a case is priced as a whole, and the loaf price is derived from it", () => {
++  const barbari = caseProduct("WS-BARBARI-25", "50.00");
++  assert.equal(loavesPerCase(barbari), 25);
++  assert.equal(loafPrice(barbari), 2);
++  assert.equal(cartSubtotal([barbari], { "WS-BARBARI-25": 3 }), 150);
++});
++
++test("case size falls back to 25 when the server omits it", () => {
++  const legacy = caseProduct("WS-LEGACY-25", "50.00");
++  delete legacy.variant.unitsPerCase;
++  assert.equal(loavesPerCase(legacy), 25);
++});
++
++test("shipping is billed on loaves, not on the case count", () => {
++  const barbari = caseProduct("WS-BARBARI-25", "50.00");
++  const cart = { "WS-BARBARI-25": 3 };
++
++  // Three cases is 75 loaves, which fills three 25-loaf boxes.
++  assert.equal(cartLoaves([barbari], cart), 75);
++  assert.deepEqual(shippingEstimate(cartLoaves([barbari], cart), shipping), {
++    boxes: 3,
++    cents: 3750,
++  });
++
++  // Passing the case count instead would bill a single box — the bug this
++  // conversion fixes, and what the server would have disagreed with.
++  assert.deepEqual(shippingEstimate(cartQuantity(cart), shipping), { boxes: 1, cents: 1250 });
++});
++
++test("mixed cases add up across differently sized cases", () => {
++  const products = [caseProduct("A", "50.00"), caseProduct("B", "36.00", 12)];
++  const cart = { A: 2, B: 3 };
++  assert.equal(cartQuantity(cart), 5);
++  assert.equal(cartLoaves(products, cart), 2 * 25 + 3 * 12);
++  assert.equal(cartSubtotal(products, cart), 2 * 50 + 3 * 36);
++});
++
++test("case and loaf labels read naturally in the singular", () => {
++  assert.equal(caseLabel(1), "1 case");
++  assert.equal(caseLabel(4), "4 cases");
++  assert.equal(loafLabel(1), "1 loaf");
++  assert.equal(loafLabel(25), "25 loaves");
++});
+--- a/wholesale-site/app/wholesale-catalog.ts
++++ b/wholesale-site/app/wholesale-catalog.ts
+@@ -175,6 +175,7 @@
+       availableForSale: true,
+       price: { amount: (casePriceCents(product) / 100).toFixed(2), currencyCode },
+       quantityRule: { minimum: MINIMUM_CASES, maximum: null, increment: 1 },
++      unitsPerCase: LOAVES_PER_CASE,
+     },
+   }));
+ }

@@ -17,6 +17,11 @@ Screens: welcome · apply step 1 · apply step 2 · status (pending) ·
 status (approved) · sign-in (email) · sign-in (code) · home · catalog ·
 product detail · cart · orders · locations · account.
 
+The captures show the app **after** the case-pricing change in
+`patches/case-pricing.patch` — bread is priced and ordered by the case
+($50.00 per case, 25 loaves, $2.00 a loaf), not by the loaf in increments
+of 25.
+
 ## How they were made
 
 `expo start` alone only serves the Metro bundler — there is no device in CI to
@@ -56,3 +61,41 @@ rather than `colors.paper`, for the same reason.
 All names, addresses, order numbers, and the sign-in code are invented sample
 data (`Saffron Kitchen Group`, `mina@saffronkitchen.com`). Shipping defaults
 ($12.50 per 25-unit box) match the app's own `DEFAULT_SHIPPING`.
+
+
+## `patches/case-pricing.patch`
+
+Converts the buyer app's pricing and quantity UI from loaves to cases.
+Apply to a clean v15 tree with `patch -p1 < patches/case-pricing.patch`;
+11 files, +209/−46.
+
+The server was already case-based: `/api/buyer/catalog` sends the price of a
+whole case as `variant.price.amount` with `quantityRule: { minimum: 1,
+increment: 1 }`, and `/api/buyer/checkout` takes `{ sku, cases }`. Only the
+mobile UI still read those numbers as loaves, so this brings the app in line
+with the contract the website's order portal already follows.
+
+What changed:
+
+- **Product card / detail** — "$50.00 per case" with "25 loaves · $2.00 each"
+  underneath; the stepper counts cases (1, 2, 3), not loaves (25, 50, 75).
+- **Cart** — lines read "2 cases × $50.00 / 50 loaves"; the subtotal row
+  names the case count.
+- **Catalog / home / welcome** — cart button reads "VIEW CART · 3 CASES";
+  home shows the real cheapest case price from the buyer's own catalog
+  (labelled FROM when cases are not all one price) instead of a hardcoded
+  `$2.50`.
+- **`format.ts`** — adds `loavesPerCase`, `loafPrice`, `cartLoaves`,
+  `caseLabel`, `loafLabel`, and documents that cart quantities are cases.
+- **`wholesale-catalog.ts`** — `catalogForClients()` now publishes
+  `unitsPerCase`, so the app reads the case size instead of assuming 25.
+  The app still falls back to 25 when the field is absent.
+
+### Shipping bug fixed along the way
+
+`CartScreen` passed the **case count** to `shippingEstimate`, which bills per
+box of **loaves**. With `unitsPerBox: 25`, a 3-case order estimated
+`ceil(3/25)` = 1 box ($12.50) while the server's `priceCart` charged
+`ceil(75/25)` = 3 boxes ($37.50) — the buyer saw $25.00 less than they were
+charged. The cart now converts to loaves first with `cartLoaves`, and a
+regression test pins both the correct result and the old wrong one.

@@ -93,41 +93,40 @@ export const account: BuyerAccount = {
   ],
 };
 
-function product(
-  id: string,
-  title: string,
-  description: string,
-  amount: string,
-  minimum: number,
-  increment: number,
-): CatalogProduct {
+/**
+ * Shaped exactly like /api/buyer/catalog's catalogForClients(): the id is the
+ * SKU, the price is the price of a whole CASE, and quantity rules count cases.
+ */
+function caseProduct(sku: string, title: string, description: string, casePrice: string): CatalogProduct {
   return {
-    id: `gid://shopify/Product/${id}`,
-    handle: title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    id: sku,
+    handle: sku.toLowerCase(),
     title,
     description,
     imageUrl: "",
     imageAlt: title,
     variant: {
-      id: `gid://shopify/ProductVariant/${id}`,
-      title: "Default",
+      id: sku,
+      title: "Case of 25",
       availableForSale: true,
-      price: { amount, currencyCode: "USD" },
-      quantityRule: { minimum, maximum: null, increment },
+      price: { amount: casePrice, currencyCode: "USD" },
+      quantityRule: { minimum: 1, maximum: null, increment: 1 },
+      unitsPerCase: 25,
     },
   };
 }
 
 export const products: CatalogProduct[] = [
-  product("101", "Classic Barbari", "Persian flatbread, 14-day shelf life", "2.50", 25, 25),
-  product("102", "Sesame Barbari", "Toasted sesame crust", "2.75", 25, 25),
-  product("103", "Whole Wheat Barbari", "Stone-milled whole wheat", "2.85", 25, 25),
-  product("104", "Mini Barbari", "Single-serve, service-ready", "1.60", 50, 50),
+  caseProduct("WS-BARBARI-25", "Barbari — Case of 25", "The classic Persian flatbread, hand-raked and sesame-finished.", "50.00"),
+  caseProduct("WS-NATURAL-25", "Natural, No Sesame — Case of 25", "Same dough and bake, finished plain.", "50.00"),
+  caseProduct("WS-WHEAT-25", "Whole Wheat — Case of 25", "Nuttier and denser, holds up under soups and stews.", "50.00"),
+  caseProduct("WS-SESAME-25", "Sesame — Case of 25", "Generously seeded across the whole loaf.", "45.00"),
 ];
 
+/** Case counts, matching what the app sends to checkout. */
 export const cart = {
-  "gid://shopify/ProductVariant/101": 50,
-  "gid://shopify/ProductVariant/102": 25,
+  "WS-BARBARI-25": 2,
+  "WS-NATURAL-25": 1,
 };
 
 export const pendingApplication: TrackedApplication = {

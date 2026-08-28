@@ -102,6 +102,7 @@ export default function App() {
             onRefresh={noop}
             onSelectLocation={noop}
             onTab={noop}
+            products={fx.products}
             selectedLocationId={locationId}
             shipping={fx.shipping}
           />
@@ -134,7 +135,7 @@ export default function App() {
         <>
           <StatusBar style="dark" />
           <ProductDetailScreen
-            initialQuantity={75}
+            initialQuantity={2}
             location={firstLocation || null}
             onBack={noop}
             onSetQuantity={noop}
