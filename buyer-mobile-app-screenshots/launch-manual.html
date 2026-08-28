@@ -1,0 +1,308 @@
+<title>Dallas Bakery Launch Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#FFF9EF; --card:#FFFFFF; --ink:#2A1B13; --muted:#756A63;
+  --rust:#AE3E26; --rust-soft:#F3E2DC; --gold:#8A5716; --gold-soft:#F4E8D2;
+  --sage:#556049; --sage-soft:#E3E8DC; --line:#E2D8C8; --code-bg:#2A1B13; --code-ink:#F3E7D5;
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;
+  --sans:"Public Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#211410; --card:#2C1D16; --ink:#F2E7D8; --muted:#B4A294;
+    --rust:#E08663; --rust-soft:#3D231B; --gold:#D9A85E; --gold-soft:#3A2A17;
+    --sage:#A9B896; --sage-soft:#28301F; --line:#443127; --code-bg:#160D09; --code-ink:#EBDCC6;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#211410; --card:#2C1D16; --ink:#F2E7D8; --muted:#B4A294;
+  --rust:#E08663; --rust-soft:#3D231B; --gold:#D9A85E; --gold-soft:#3A2A17;
+  --sage:#A9B896; --sage-soft:#28301F; --line:#443127; --code-bg:#160D09; --code-ink:#EBDCC6;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.65}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px 96px}
+header.hero{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;color:var(--rust);font-weight:600;font-size:12px;letter-spacing:.22em}
+.brand svg{width:30px;height:30px}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(38px,6vw,60px);line-height:1.05;margin-top:20px;text-wrap:balance}
+.lede{max-width:62ch;margin-top:18px;color:var(--muted);font-size:17px}
+.lede strong{color:var(--ink)}
+.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.meta span{font-size:12.5px;font-weight:500;padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:var(--card)}
+.layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:56px;margin-top:48px}
+@media(max-width:860px){.layout{grid-template-columns:1fr;gap:0}}
+nav.rail{position:sticky;top:28px;align-self:start;display:grid;gap:2px;font-size:13.5px}
+@media(max-width:860px){nav.rail{position:static;grid-template-columns:1fr 1fr;margin-bottom:36px}}
+nav.rail a{color:var(--muted);text-decoration:none;padding:8px 12px;border-left:2px solid var(--line)}
+nav.rail a:hover,nav.rail a:focus-visible{color:var(--rust);border-left-color:var(--rust);outline:none}
+nav.rail .rail-label{font-size:10.5px;letter-spacing:.18em;color:var(--rust);padding:0 12px 10px;font-weight:600}
+main{max-width:70ch}
+section{padding:44px 0;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:none}
+.part-kicker{display:flex;align-items:baseline;gap:12px;color:var(--rust);font-size:12px;font-weight:600;letter-spacing:.2em}
+.part-kicker em{font-family:var(--serif);font-style:normal;font-size:26px;letter-spacing:0}
+h2{font-family:var(--serif);font-weight:600;font-size:clamp(26px,3.6vw,34px);line-height:1.15;margin:10px 0 8px;text-wrap:balance}
+.part-time{color:var(--muted);font-size:13.5px}
+section>p{margin-top:16px}
+section>p, .step p{max-width:65ch}
+a{color:var(--rust)}
+.step{display:grid;grid-template-columns:34px minmax(0,1fr);gap:16px;margin-top:28px}
+.step-n{width:34px;height:34px;border-radius:50%;background:var(--rust);color:var(--paper);display:grid;place-items:center;font-family:var(--serif);font-size:16px;font-weight:600}
+:root[data-theme="dark"] .step-n{color:#211410}
+.step h3{font-size:17px;font-weight:600;padding-top:5px}
+.step p{margin-top:8px;color:var(--ink)}
+.step p.why{color:var(--muted);font-size:14.5px}
+pre.cmd{position:relative;background:var(--code-bg);color:var(--code-ink);font-family:var(--mono);font-size:13.5px;line-height:1.7;padding:14px 52px 14px 18px;margin-top:12px;border-radius:4px;overflow-x:auto}
+pre.cmd .c{opacity:.55}
+button.copy{position:absolute;top:8px;right:8px;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--code-ink);font-family:var(--sans);font-size:11px;padding:4px 9px;border-radius:3px;cursor:pointer}
+button.copy:hover,button.copy:focus-visible{border-color:var(--code-ink);outline:none}
+code{font-family:var(--mono);font-size:.88em;background:var(--rust-soft);padding:1px 5px;border-radius:3px}
+pre code{background:none;padding:0}
+.note{margin-top:16px;padding:14px 16px;border-left:3px solid var(--gold);background:var(--gold-soft);font-size:14.5px}
+.note.blocker{border-left-color:var(--rust);background:var(--rust-soft)}
+.note strong{font-weight:600}
+.tablewrap{overflow-x:auto;margin-top:14px;border:1px solid var(--line);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--card)}
+th{font-size:10.5px;letter-spacing:.14em;text-align:left;color:var(--muted);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line)}
+td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td:first-child{font-family:var(--mono);font-size:12.5px;white-space:nowrap;color:var(--rust)}
+.admin-list{display:grid;gap:10px;margin-top:18px}
+.admin-list div{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:13px 16px;font-size:14.5px}
+.admin-list strong{font-weight:600}
+.check{display:grid;gap:8px;margin-top:18px}
+.check label{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:12px 14px;font-size:14.5px;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--sage);width:16px;height:16px;flex:none}
+.check label:has(input:checked){border-color:var(--sage);background:var(--sage-soft)}
+.fix{display:grid;gap:0;margin-top:18px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.fix div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);background:var(--card)}
+.fix div+div{border-top:1px solid var(--line)}
+.fix b{padding:12px 16px;font-size:14px;font-weight:600;border-right:1px solid var(--line)}
+.fix span{padding:12px 16px;font-size:14px;color:var(--muted)}
+@media(max-width:600px){.fix div{grid-template-columns:1fr}.fix b{border-right:none;padding-bottom:2px}.fix span{padding-top:2px}}
+footer{margin-top:56px;color:var(--muted);font-size:13.5px;max-width:65ch}
+@media (prefers-reduced-motion: no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+<header class="hero">
+  <div class="brand">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 42V12m0 7c-6-1-9-5-9-10 6 1 9 5 9 10Zm0 8c-6-1-10-5-10-10 6 1 10 5 10 10Zm0 8c-6-1-10-5-10-10 6 1 10 5 10 10Zm0-16c6-1 9-5 9-10-6 1-9 5-9 10Zm0 8c6-1 10-5 10-10-6 1-10 5-10 10Zm0 8c6-1 10-5 10-10-6 1-10 5-10 10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    DALLAS BAKERY WHOLESALE
+  </div>
+  <h1>From this folder to your first paid order.</h1>
+  <p class="lede">This manual takes the source code you were handed and turns it into a live store — the website, the payments, the shipping labels, the emails, and then the phone apps. <strong>No programming knowledge is assumed.</strong> Follow it top to bottom; nothing here is optional except where it says so.</p>
+  <div class="meta">
+    <span>⏱ About half a day, first time</span>
+    <span>💳 A credit card for accounts</span>
+    <span>🖥 A Mac or Windows computer</span>
+  </div>
+</header>
+
+<div class="layout">
+<nav class="rail" aria-label="Parts">
+  <div class="rail-label">THE PARTS</div>
+  <a href="#words">Three words to know</a>
+  <a href="#accounts">1 · Accounts</a>
+  <a href="#website">2 · The website</a>
+  <a href="#daytoday">3 · Day to day</a>
+  <a href="#apps">4 · The phone apps</a>
+  <a href="#test">5 · The launch test</a>
+  <a href="#broke">If something breaks</a>
+</nav>
+
+<main>
+<section id="words">
+  <h2>Three words you'll see everywhere</h2>
+  <p><strong>Terminal</strong> — a window where you type commands instead of clicking. Mac: open <em>Applications → Utilities → Terminal</em>. Windows: install the free program <em>Git Bash</em> and open that. Every command in this manual is typed there, then you press Return.</p>
+  <p><strong>Secret</strong> — a password-like value you copy from one dashboard and paste into another. Treat every secret like the key to the till: never email it, never screenshot it.</p>
+  <p><strong>Deploy</strong> — one command (<code>npm run deploy</code>) that pushes your latest settings to the live website. Whenever this manual says "deploy again," that's the whole instruction.</p>
+  <div class="note">Before anything works, install <strong>Node.js</strong> once: go to <strong>nodejs.org</strong>, download the version marked <em>LTS</em>, and install it like any app. That's the only program the whole setup needs.</div>
+</section>
+
+<section id="accounts">
+  <div class="part-kicker"><em>Part 1</em> ACCOUNTS</div>
+  <h2>Open five accounts</h2>
+  <p class="part-time">About an hour. Use your business email for all of them, and write each login down somewhere safe.</p>
+
+  <div class="step"><div class="step-n">1</div><div><h3>Cloudflare — hosts the website</h3>
+    <p>Sign up at <strong>cloudflare.com</strong>. The free plan works; the $5/month Workers Paid plan is recommended once you're live. While you're there, click <em>Add a site</em> and follow the steps to bring <strong>dallasbakery.net</strong> into this account — Cloudflare shows you exactly what to change at your current domain company.</p></div></div>
+
+  <div class="step"><div class="step-n">2</div><div><h3>Stripe — takes the card payments</h3>
+    <p>Sign up at <strong>stripe.com</strong> and complete business activation (bank account, tax ID). Free to open; Stripe keeps roughly 2.9% + 30¢ of each card payment and deposits the rest to your bank.</p></div></div>
+
+  <div class="step"><div class="step-n">3</div><div><h3>Resend — sends your email</h3>
+    <p>Sign up at <strong>resend.com</strong>. This sends buyers their sign-in codes, order confirmations, and tracking numbers. The free tier easily covers a small bakery.</p>
+    <p class="why">Without this one, buyers literally cannot sign in — their code arrives by email.</p></div></div>
+
+  <div class="step"><div class="step-n">4</div><div><h3>UPS developer access — buys shipping labels</h3>
+    <p>Go to <strong>developer.ups.com</strong>, sign in with your existing UPS account, and create an "app". It gives you a <em>Client ID</em> and <em>Client Secret</em>. You'll also need your six-character UPS <em>account number</em> — it's on any UPS invoice.</p></div></div>
+
+  <div class="step"><div class="step-n">5</div><div><h3>Expo, Apple &amp; Google — for the phone apps (can wait)</h3>
+    <p><strong>expo.dev</strong> (free, builds the apps), <strong>developer.apple.com</strong> ($99/year — business verification can take a few days, so start it early), and <strong>play.google.com/console</strong> ($25 once). Skip these until Part 4 if you want the website live first.</p></div></div>
+</section>
+
+<section id="website">
+  <div class="part-kicker"><em>Part 2</em> THE WEBSITE</div>
+  <h2>Put dallasbakery.net live</h2>
+  <p class="part-time">About two hours. Open Terminal, then copy each command below — the button on each block copies it for you.</p>
+
+  <div class="step"><div class="step-n">1</div><div><h3>Go to the website folder and connect to Cloudflare</h3>
+<pre class="cmd"><code>cd wholesale-site
+npm install
+npx wrangler login</code></pre>
+    <p class="why">The last command opens your browser — log into Cloudflare and click Allow.</p></div></div>
+
+  <div class="step"><div class="step-n">2</div><div><h3>Create the database</h3>
+<pre class="cmd"><code>npx wrangler d1 create dallas-bakery-wholesale</code></pre>
+    <p>This prints a <code>database_id</code> — a long string of letters and numbers. Open the file <code>wrangler.deploy.jsonc</code> in any text editor, find <code>REPLACE_WITH_D1_DATABASE_ID</code>, paste your id in its place, and save.</p>
+    <p>Then load the database's tables (run this again after every future update, too):</p>
+<pre class="cmd"><code>npm run db:migrate</code></pre></div></div>
+
+  <div class="step"><div class="step-n">3</div><div><h3>Set the secrets</h3>
+    <p>For each row of the table, run this command with the NAME filled in, and paste the value when it asks:</p>
+<pre class="cmd"><code>npx wrangler secret put NAME --config wrangler.deploy.jsonc</code></pre>
+    <p>Where the table says <em>random</em>, make one by running <code>openssl rand -base64 32</code> and copying what it prints.</p>
+    <div class="tablewrap"><table>
+      <tr><th>SECRET NAME</th><th>WHERE THE VALUE COMES FROM</th></tr>
+      <tr><td>STRIPE_SECRET_KEY</td><td>Stripe → Developers → API keys → <strong>Secret key</strong> (starts <code>sk_live_</code>)</td></tr>
+      <tr><td>STRIPE_PUBLISHABLE_KEY</td><td>Same page → <strong>Publishable key</strong> (starts <code>pk_live_</code>)</td></tr>
+      <tr><td>STRIPE_WEBHOOK_SECRET</td><td>Comes from step 5 — come back for this one</td></tr>
+      <tr><td>MAIL_API_KEY</td><td>Resend → API Keys → Create API key</td></tr>
+      <tr><td>MAIL_FROM</td><td><code>Dallas Bakery Wholesale &lt;wholesale@dallasbakery.net&gt;</code></td></tr>
+      <tr><td>MAIL_REPLY_TO</td><td><code>sales@dallasbakery.com</code></td></tr>
+      <tr><td>ADMIN_LOGIN_EMAIL</td><td><code>sales@dallasbakery.com</code></td></tr>
+      <tr><td>ADMIN_BOOTSTRAP_PASSWORD_HASH</td><td>Run <code>npm run admin:hash-password</code>, type a temporary password (14+ characters, letters and numbers), paste the line it prints</td></tr>
+      <tr><td>ADMIN_SESSION_SECRET</td><td>random</td></tr>
+      <tr><td>BUYER_SESSION_SECRET</td><td>random</td></tr>
+      <tr><td>APPLICATION_RATE_LIMIT_SECRET</td><td>random</td></tr>
+      <tr><td>APPLICATION_TRACKING_SECRET</td><td>random</td></tr>
+      <tr><td>PUBLIC_SITE_URL</td><td><code>https://dallasbakery.net</code></td></tr>
+      <tr><td>UPS_CLIENT_ID</td><td>developer.ups.com → your app</td></tr>
+      <tr><td>UPS_CLIENT_SECRET</td><td>developer.ups.com → your app</td></tr>
+      <tr><td>UPS_ACCOUNT_NUMBER</td><td>Your six-character UPS shipper number</td></tr>
+      <tr><td>UPS_ENVIRONMENT</td><td><code>test</code> for now — you'll switch it to <code>production</code> in Part 5</td></tr>
+    </table></div></div></div>
+
+  <div class="step"><div class="step-n">4</div><div><h3>Deploy, then attach your domain</h3>
+<pre class="cmd"><code>npm run deploy</code></pre>
+    <p>In the Cloudflare dashboard: <em>Workers &amp; Pages → dallas-bakery-wholesale → Settings → Domains &amp; Routes → Add → Custom domain</em> → type <code>dallasbakery.net</code>.</p></div></div>
+
+  <div class="step"><div class="step-n">5</div><div><h3>Tell Stripe where to report paid orders</h3>
+    <p>In Stripe: <em>Developers → Webhooks → Add endpoint</em>.</p>
+    <p>Endpoint URL: <code>https://dallasbakery.net/api/webhooks/stripe</code><br>
+    Events to send: tick <code>payment_intent.succeeded</code> and <code>checkout.session.completed</code>.</p>
+    <p>After saving, Stripe shows a <strong>Signing secret</strong> (starts <code>whsec_</code>). Store it as <code>STRIPE_WEBHOOK_SECRET</code> using the step-3 command, then deploy again.</p>
+    <p class="why">This is the messenger that carries every paid order into your shipping queue. Without it, cards get charged but no order ever appears.</p></div></div>
+
+  <div class="step"><div class="step-n">6</div><div><h3>Verify your email domain</h3>
+    <p>In Resend: <em>Domains → Add domain</em> → <code>dallasbakery.net</code>. Resend lists 3–4 <em>DNS records</em>. In Cloudflare, open your domain → <em>DNS</em> → add each record exactly as shown. Come back to Resend until it says <strong>Verified</strong>.</p>
+    <div class="note blocker"><strong>Hard blocker:</strong> until Resend shows Verified, buyers cannot receive sign-in codes — which means nobody can order.</div></div></div>
+
+  <div class="step"><div class="step-n">7</div><div><h3>Log into your admin</h3>
+    <p>Go to <code>https://dallasbakery.net/admin</code>. Sign in with <code>sales@dallasbakery.com</code> and the temporary password from step 3 — it will ask you to choose a permanent one. The <em>Launch connections</em> panel shows a checklist of everything above; each row tells you what's still missing.</p></div></div>
+</section>
+
+<section id="daytoday">
+  <div class="part-kicker"><em>Part 3</em> DAY TO DAY</div>
+  <h2>Running the store needs no Terminal</h2>
+  <p>Everything from here on happens by clicking around <code>dallasbakery.net/admin</code>:</p>
+  <div class="admin-list">
+    <div><strong>Products</strong> — add a bread, change its name, description, price per loaf, loaves per case, photo, and the packed box's <strong>weight and size</strong>. UPS buys each case's label from those exact numbers, so enter what the box really weighs. Hide takes a bread off sale; Delete removes it for good (past orders keep their records either way). Changes appear on the website and app instantly.</div>
+    <div><strong>Account approvals</strong> — new wholesale applications wait here. Approve or decline; approved buyers can order the same minute. On an approved business's card you can also add extra <strong>delivery locations</strong> for their other stores.</div>
+    <div><strong>Bake sheet</strong> — every morning, how many cases of each bread today's unshipped orders need. There's a Print button sized for the bench.</div>
+    <div><strong>Shipping queue</strong> — tick orders → <em>Create labels</em> → <em>Print labels</em> (your thermal printer) → <em>Mark shipped</em>, which emails every buyer their tracking number automatically. A not-yet-shipped order can be refunded in full from its row.</div>
+    <div><strong>Case shipping</strong> — the per-case shipping price buyers pay, and the fallback box weight.</div>
+  </div>
+</section>
+
+<section id="apps">
+  <div class="part-kicker"><em>Part 4</em> THE PHONE APPS</div>
+  <h2>Put the buyer app in the stores</h2>
+  <p class="part-time">Do this only after the website works — the apps are a window onto it. Expect 1–3 weeks total, mostly waiting on Apple.</p>
+
+  <div class="step"><div class="step-n">1</div><div><h3>Install the build tool</h3>
+<pre class="cmd"><code>npm install -g eas-cli
+eas login</code></pre></div></div>
+
+  <div class="step"><div class="step-n">2</div><div><h3>Configure the buyer app</h3>
+<pre class="cmd"><code>cd buyer-mobile-app
+npm install
+eas build:configure</code></pre>
+    <p>Then on the <strong>expo.dev</strong> website, open your project → <em>Environment variables</em> and add two, for the production profile:</p>
+    <p><code>EXPO_PUBLIC_API_URL</code> = <code>https://dallasbakery.net</code><br>
+    <code>EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> = your <code>pk_live_…</code> key</p>
+    <p class="why">The build refuses to finish without these — that's deliberate, because an app without them would install fine and then fail at checkout.</p></div></div>
+
+  <div class="step"><div class="step-n">3</div><div><h3>Test on a real phone first</h3>
+<pre class="cmd"><code>eas build --profile preview --platform ios</code></pre>
+    <p>Install the build it gives you on your own phone and pay for one small order. The card sheet only exists in real builds — no web preview can test it.</p></div></div>
+
+  <div class="step"><div class="step-n">4</div><div><h3>Build and submit</h3>
+<pre class="cmd"><code>eas build --platform ios
+eas build --platform android
+eas submit --platform ios
+eas submit --platform android</code></pre>
+    <p>EAS asks the Apple/Google signing questions — accepting the defaults is fine. In App Store Connect, fill in the listing (the screenshots are included in this package).</p>
+    <div class="note"><strong>Apple needs a demo login.</strong> The app is sign-in-only, so approve a test application for an inbox you control, and in the review notes tell Apple: "Sign in with <em>that email</em> — a six-digit code is emailed to it." Reviews take 1–3 days and a first rejection is normal; fix what they name and resubmit.</div>
+    <p>The owner app (<code>owner-mobile-app</code>) follows the same steps and only needs <code>EXPO_PUBLIC_API_URL</code>.</p></div></div>
+</section>
+
+<section id="test">
+  <div class="part-kicker"><em>Part 5</em> THE LAUNCH TEST</div>
+  <h2>One real order, end to end</h2>
+  <p>Before telling customers: approve a test application for an email you control, sign in at <code>dallasbakery.net/order</code>, and place a real card order (refund it from the admin afterwards). Tick each box as it happens:</p>
+  <div class="check">
+    <label><input type="checkbox" data-k="pay"> The card payment goes through</label>
+    <label><input type="checkbox" data-k="queue"> The order appears in the admin shipping queue</label>
+    <label><input type="checkbox" data-k="owner"> You receive the owner alert email</label>
+    <label><input type="checkbox" data-k="buyer"> The buyer receives the confirmation email</label>
+    <label><input type="checkbox" data-k="label"> A UPS <em>test</em> label is created and prints</label>
+    <label><input type="checkbox" data-k="track"> Mark shipped sends the tracking email, and tracking appears under My Orders</label>
+    <label><input type="checkbox" data-k="standing"> Bonus: save a standing weekly order and confirm the saved card charged on its day</label>
+  </div>
+  <p style="margin-top:18px">All ticked? Change the <code>UPS_ENVIRONMENT</code> secret to <code>production</code>, deploy once more, and open the doors.</p>
+</section>
+
+<section id="broke">
+  <h2>If something breaks</h2>
+  <div class="fix">
+    <div><b>Buyers don't receive sign-in codes</b><span>Resend domain isn't Verified yet — Part 2, step 6.</span></div>
+    <div><b>Card charged but no order in the admin</b><span>Webhook secret wrong, or the endpoint URL has a typo — Part 2, step 5.</span></div>
+    <div><b>Labels fail</b><span>UPS credentials wrong, or <code>UPS_ENVIRONMENT</code> still says <code>test</code>.</span></div>
+    <div><b>The card form never loads</b><span><code>STRIPE_PUBLISHABLE_KEY</code> is missing or is a <code>sk_</code> key by mistake.</span></div>
+    <div><b>Any secret was wrong</b><span>Fix it with the step-3 command, then <code>npm run deploy</code> again. That pattern fixes almost everything.</span></div>
+  </div>
+  <footer>The technical details live in the source package: <code>SETUP_GUIDE.md</code> (this manual), <code>wholesale-site/DEPLOYMENT.md</code>, <code>LAUNCH_CHECKLIST.md</code>, and each app's README.</footer>
+</section>
+</main>
+</div>
+</div>
+
+<script>
+document.querySelectorAll("pre.cmd").forEach(function(pre){
+  var btn=document.createElement("button");
+  btn.className="copy";btn.type="button";btn.textContent="Copy";
+  btn.addEventListener("click",function(){
+    var text=pre.querySelector("code").innerText;
+    navigator.clipboard.writeText(text).then(function(){
+      btn.textContent="Copied";setTimeout(function(){btn.textContent="Copy"},1600);
+    });
+  });
+  pre.appendChild(btn);
+});
+try{
+  var saved=JSON.parse(localStorage.getItem("db-launch-checklist")||"{}");
+  document.querySelectorAll(".check input").forEach(function(box){
+    if(saved[box.dataset.k])box.checked=true;
+    box.addEventListener("change",function(){
+      saved[box.dataset.k]=box.checked;
+      try{localStorage.setItem("db-launch-checklist",JSON.stringify(saved))}catch(e){}
+    });
+  });
+}catch(e){}
+</script>
