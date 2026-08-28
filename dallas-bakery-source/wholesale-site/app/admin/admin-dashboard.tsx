@@ -45,6 +45,8 @@ type Props = {
   initialApplications: WholesaleApplication[];
   /** Unpaid account-order totals per application id. */
   initialOutstanding: Record<string, number>;
+  /** The past-due slice of those totals per application id. */
+  initialOverdue: Record<string, number>;
   initialShipping: {
     rateCents: number;
     unitsPerBox: number;
@@ -108,7 +110,7 @@ function statusLabel(status: string) {
   return "Pending";
 }
 
-export default function AdminDashboard({ initialApplications, initialOutstanding, initialShipping, readiness, user }: Props) {
+export default function AdminDashboard({ initialApplications, initialOutstanding, initialOverdue, initialShipping, readiness, user }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [filter, setFilter] = useState<"pending" | "approved" | "declined" | "all">("pending");
   const [query, setQuery] = useState("");
@@ -192,31 +194,39 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
     const action = status === "approved" ? "approve" : status === "declined" ? "decline" : "move to pending";
     if (!window.confirm(`Are you sure you want to ${action} ${application.businessName}?`)) return;
 
-    // Approval is the moment to decide on credit: a limit plus Net 15/30
-    // terms lets this buyer order on account (invoiced, no card). Cancel
-    // keeps whatever the account already has; both can be changed any time
-    // in the Credit terms box on the card.
+    // Approval is the moment to decide on terms: Net 15/30 is the account,
+    // and the net limit is the most this buyer can owe on it. Cancel keeps
+    // whatever the account already has; both can be changed any time in the
+    // Net terms box on the card.
     let creditLimitCents: number | undefined;
     let creditTermsDays: number | undefined;
     if (status === "approved") {
-      const answer = window.prompt(
-        `Give ${application.businessName} a credit limit?\n\n` +
-        "Enter a dollar amount to let them order on account (you invoice them), " +
-        "or 0 to keep them card-only. You can change this later on their card.",
-        ((application.creditLimitCents || 0) / 100).toFixed(0),
+      const termsAnswer = window.prompt(
+        `Put ${application.businessName} on net terms?\n\n` +
+        "Type 30 for Net 30, 15 for Net 15, or 0 for card-only. " +
+        "You can change this later in the Net terms box on their card.",
+        String(application.creditTermsDays || 30),
       );
-      if (answer !== null && answer.trim() !== "") {
-        const dollars = Number(answer.replace(/[$,\s]/g, ""));
-        if (Number.isFinite(dollars) && dollars >= 0 && dollars <= 250_000) {
-          creditLimitCents = Math.round(dollars * 100);
+      if (termsAnswer !== null) {
+        const days = Number(termsAnswer.trim());
+        if (days === 0) {
+          creditTermsDays = 0;
+          creditLimitCents = 0;
+        } else if (days === 15 || days === 30) {
+          const limitAnswer = window.prompt(
+            `Net ${days} limit for ${application.businessName} — the most they can owe at once?`,
+            application.creditLimitCents > 0
+              ? (application.creditLimitCents / 100).toFixed(0)
+              : "1500",
+          );
+          if (limitAnswer !== null && limitAnswer.trim() !== "") {
+            const dollars = Number(limitAnswer.replace(/[$,\s]/g, ""));
+            if (Number.isFinite(dollars) && dollars > 0 && dollars <= 250_000) {
+              creditTermsDays = days;
+              creditLimitCents = Math.round(dollars * 100);
+            }
+          }
         }
-      }
-      if (creditLimitCents !== undefined && creditLimitCents > 0) {
-        const termsAnswer = window.prompt(
-          `Payment terms for ${application.businessName}: type 30 for Net 30, or 15 for Net 15.`,
-          String(application.creditTermsDays === 30 ? 30 : 15),
-        );
-        creditTermsDays = Number(String(termsAnswer || "").trim()) === 30 ? 30 : 15;
       }
     }
     void updateApplication(application, status, creditLimitCents, creditTermsDays);
@@ -444,6 +454,7 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
                   creditLimitCents={application.creditLimitCents || 0}
                   creditTermsDays={application.creditTermsDays || 0}
                   outstandingCents={initialOutstanding[application.id] || 0}
+                  overdueCents={initialOverdue[application.id] || 0}
                   pending={application.status === "pending"}
                   onSave={(cents, days) => updateApplication(application, application.status, cents, days)}
                 />

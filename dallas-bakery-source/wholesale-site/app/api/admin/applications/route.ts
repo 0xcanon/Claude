@@ -104,15 +104,6 @@ export async function PATCH(request: Request) {
     if (problem) return Response.json({ error: problem }, { status: 400 });
     creditTermsDays = days;
   }
-  // A credit line always carries terms: granting a limit without choosing
-  // any defaults to Net 15, and revoking the limit clears the terms.
-  if (creditLimitCents !== undefined && creditLimitCents > 0 && !creditTermsDays) {
-    creditTermsDays = 15;
-  }
-  if (creditLimitCents === 0 && creditTermsDays === undefined) {
-    creditTermsDays = 0;
-  }
-
   const application = await updateWholesaleApplication({
     id,
     status: status as "pending" | "approved" | "declined",

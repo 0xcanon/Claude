@@ -7,12 +7,13 @@ import {
   invoiceDueDateIso,
   netTermsLabel,
   overLimitMessage,
+  pastDueMessage,
   validateCreditLimitCents,
   validateNetTermsDays,
 } from "../app/credit-terms.ts";
 
 test("credit state: available is limit minus outstanding", () => {
-  const state = computeCreditState(150_000, 40_000);
+  const state = computeCreditState(150_000, 40_000, 30);
   assert.equal(state.limitCents, 150_000);
   assert.equal(state.outstandingCents, 40_000);
   assert.equal(state.availableCents, 110_000);
@@ -26,7 +27,7 @@ test("credit state: zero limit means card-only", () => {
 });
 
 test("credit state: available floors at zero after the owner lowers a limit", () => {
-  const state = computeCreditState(50_000, 80_000);
+  const state = computeCreditState(50_000, 80_000, 15);
   assert.equal(state.availableCents, 0);
   assert.equal(state.outstandingCents, 80_000);
   assert.equal(state.enabled, true);
@@ -39,14 +40,37 @@ test("credit state: garbage inputs clamp instead of going negative", () => {
   assert.equal(state.enabled, false);
 });
 
+test("net terms are the account: a limit without terms (or terms without a limit) is card-only", () => {
+  assert.equal(computeCreditState(150_000, 0, 0).enabled, false);
+  assert.equal(computeCreditState(0, 0, 30).enabled, false);
+  assert.equal(computeCreditState(150_000, 0, 15).enabled, true);
+  assert.equal(computeCreditState(150_000, 0, 30).enabled, true);
+});
+
+test("a past-due balance locks the account: pay by card until it is settled", () => {
+  const locked = computeCreditState(150_000, 40_000, 30, 19_500);
+  assert.equal(locked.overdueCents, 19_500);
+  const verdict = assessAccountOrder(locked, 7_500);
+  assert.equal(verdict.ok, false);
+  if (!verdict.ok) {
+    assert.match(verdict.error, /past due/i);
+    assert.match(verdict.error, /\$195\.00/);
+    assert.match(verdict.error, /card/i);
+    assert.match(verdict.error, /Net 30/);
+  }
+  // Settling the overdue slice reopens the account.
+  assert.equal(assessAccountOrder(computeCreditState(150_000, 40_000, 30, 0), 7_500).ok, true);
+  assert.match(pastDueMessage(locked), /resumes once the past-due balance is settled/);
+});
+
 test("account order: fits when at or under available credit", () => {
-  const state = computeCreditState(150_000, 40_000);
+  const state = computeCreditState(150_000, 40_000, 30);
   assert.deepEqual(assessAccountOrder(state, 110_000), { ok: true });
   assert.deepEqual(assessAccountOrder(state, 7_500), { ok: true });
 });
 
 test("account order: rejected over the available credit — points to the open invoices", () => {
-  const verdict = assessAccountOrder(computeCreditState(150_000, 100_000), 60_000);
+  const verdict = assessAccountOrder(computeCreditState(150_000, 100_000, 15), 60_000);
   assert.equal(verdict.ok, false);
   if (!verdict.ok) {
     assert.match(verdict.error, /\$500\.00/);
@@ -58,28 +82,28 @@ test("account order: rejected over the available credit — points to the open i
 });
 
 test("account order: over the limit with nothing outstanding points straight to card", () => {
-  const verdict = assessAccountOrder(computeCreditState(150_000, 0), 200_000);
+  const verdict = assessAccountOrder(computeCreditState(150_000, 0, 30), 200_000);
   assert.equal(verdict.ok, false);
   if (!verdict.ok) {
-    assert.match(verdict.error, /\$1,500\.00 credit limit/);
+    assert.match(verdict.error, /\$1,500\.00 net limit/);
     assert.match(verdict.error, /card/i);
     assert.doesNotMatch(verdict.error, /invoice/i);
   }
 });
 
-test("the credit line can never go negative: an order equal to available passes, one cent more fails", () => {
-  const state = computeCreditState(150_000, 100_000);
+test("the net balance can never go negative: an order equal to available passes, one cent more fails", () => {
+  const state = computeCreditState(150_000, 100_000, 30);
   assert.equal(assessAccountOrder(state, 50_000).ok, true);
   assert.equal(assessAccountOrder(state, 50_001).ok, false);
   // And available itself is clamped at zero even when outstanding exceeds
   // the limit (the owner lowered it after orders were placed).
-  assert.equal(computeCreditState(50_000, 80_000).availableCents, 0);
-  assert.equal(assessAccountOrder(computeCreditState(50_000, 80_000), 1).ok, false);
+  assert.equal(computeCreditState(50_000, 80_000, 30).availableCents, 0);
+  assert.equal(assessAccountOrder(computeCreditState(50_000, 80_000, 30), 1).ok, false);
 });
 
 test("over-limit message names the invoice balance only when one exists", () => {
-  assert.match(overLimitMessage(computeCreditState(150_000, 40_000)), /invoice balance \(\$400\.00\)/);
-  assert.doesNotMatch(overLimitMessage(computeCreditState(150_000, 0)), /invoice/);
+  assert.match(overLimitMessage(computeCreditState(150_000, 40_000, 15)), /invoice balance \(\$400\.00\)/);
+  assert.doesNotMatch(overLimitMessage(computeCreditState(150_000, 0, 15)), /invoice/);
 });
 
 test("account order: rejected outright without a credit line", () => {
@@ -89,7 +113,7 @@ test("account order: rejected outright without a credit line", () => {
 });
 
 test("account order: zero or fractional totals never pass", () => {
-  const state = computeCreditState(150_000, 0);
+  const state = computeCreditState(150_000, 0, 15);
   assert.equal(assessAccountOrder(state, 0).ok, false);
   assert.equal(assessAccountOrder(state, 75.5).ok, false);
 });

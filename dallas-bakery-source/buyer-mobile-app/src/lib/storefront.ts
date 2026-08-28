@@ -35,6 +35,8 @@ export type CreditState = {
   availableCents: number;
   /** 15 or 30 for Net terms; 0 when the account has none. */
   termsDays: number;
+  /** The slice of the balance past its due date — locks on-account ordering. */
+  overdueCents: number;
 };
 
 export type CatalogPayload = {

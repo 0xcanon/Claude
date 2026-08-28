@@ -134,27 +134,23 @@ Everything happens at `https://dallasbakery.net/admin`:
 - **Case shipping** — the per-case shipping price buyers pay. Like every
   price, it shows only inside a signed-in buyer account — the public pages
   and the app's welcome screen never display a dollar figure.
-- **Credit terms** — when you approve an account you'll be asked whether to
-  give it a credit limit and **Net 15 or Net 30** payment terms. Only the
-  customers you choose get terms at all, and you can set them on a *pending*
-  application too — they take effect the moment you approve it — or change
-  them any time on the card. Every account order stamps its invoice due date
-  from the customer's terms (order date + 15 or 30 days); the shipping queue
-  shows it, flags **OVERDUE** in red when the date passes unpaid, and the
-  buyer sees the due date on their confirmation and order history. A buyer with credit checks out **on account by default** — they are
-  never asked for a card. "Place order on account" is the main button on the
-  website and in the app; "Pay by card instead" sits underneath for whoever
-  prefers it, and a card is only *required* when an order is over their
-  available credit. The order comes straight to your shipping queue tagged
-  **ON ACCOUNT**, nothing is charged to a card, and you invoice them however
-  you normally do. When they pay you, open the order in
-  the queue and press **Mark invoice paid** — that frees up their credit for
-  the next order. Unpaid account orders always count against the limit, and the
-  account can never owe more than its limit: an order that would go over is
-  refused at checkout and pointed the right way — pay the open invoice
-  balance to free up credit, or pay that order by card. Cancelling an
-  un-shipped account order releases its amount instantly (no Stripe involved,
-  since no card was charged).
+- **Net terms** — Net 15 / Net 30 is the account, and it's only for the
+  customers you choose. When you approve an application you're asked whether
+  to put the business on Net 15, Net 30, or keep it card-only; if you pick
+  terms, you set their **net limit** — the most they can owe at once. You
+  can also set all of this on a *pending* application (it goes live the
+  moment you approve) or change it any time in the **Net terms** box on
+  their card. A buyer on terms checks out on account by default — never
+  asked for a card — with "Pay by card instead" underneath. Every account
+  order stamps its invoice due date (order date + 15 or 30 days); the
+  shipping queue shows it and turns red **OVERDUE** when the date passes
+  unpaid. **The moment anything is past due, their account locks**: the
+  buyer sees a past-due notice everywhere and every new order must be paid
+  by card, until you press **Mark invoice paid** on the overdue orders in
+  the shipping queue — that's how you record that their net balance was
+  settled, and their account reopens instantly. The balance can never pass
+  the net limit, and cancelling an un-shipped account order releases its
+  amount (no Stripe involved, since no card was charged).
 - **Exclusive pricing** — on any approved buyer's card, open **Exclusive
   pricing** to give that business its own price per loaf on any bread. Each
   buyer's catalog simply shows their prices as *the* prices — nothing hints

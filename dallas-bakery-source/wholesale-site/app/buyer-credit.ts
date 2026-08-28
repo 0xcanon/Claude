@@ -28,9 +28,13 @@ export async function creditStateFor(applicationId: string): Promise<CreditState
     .where(eq(wholesaleApplications.id, id))
     .limit(1);
   // Refunded account orders were cancelled before invoicing and never owe
-  // anything, so they don't hold credit.
+  // anything, so they don't hold credit. The overdue slice — unpaid past its
+  // due date — locks the account until the owner marks it settled.
   const [balance] = await db
-    .select({ outstandingCents: sql<number>`COALESCE(SUM(${orders.totalCents}), 0)` })
+    .select({
+      outstandingCents: sql<number>`COALESCE(SUM(${orders.totalCents}), 0)`,
+      overdueCents: sql<number>`COALESCE(SUM(CASE WHEN ${orders.invoiceDueAt} IS NOT NULL AND ${orders.invoiceDueAt} < date('now') THEN ${orders.totalCents} ELSE 0 END), 0)`,
+    })
     .from(orders)
     .where(and(
       eq(orders.applicationId, id),
@@ -42,5 +46,6 @@ export async function creditStateFor(applicationId: string): Promise<CreditState
     application?.creditLimitCents ?? 0,
     Number(balance?.outstandingCents || 0),
     application?.creditTermsDays ?? 0,
+    Number(balance?.overdueCents || 0),
   );
 }

@@ -31,12 +31,14 @@ async function AdminPortal() {
       .orderBy(desc(wholesaleApplications.createdAt))
       .limit(250),
     getWholesaleShippingSettings(),
-    // Unpaid account orders per business, so credit lines render as
-    // "used / limit" without a query per application card.
+    // Unpaid account orders per business — total and the past-due slice —
+    // so net accounts render as "used / limit" and flag overdue balances
+    // without a query per application card.
     getDb()
       .select({
         applicationId: orders.applicationId,
         outstandingCents: sql<number>`COALESCE(SUM(${orders.totalCents}), 0)`,
+        overdueCents: sql<number>`COALESCE(SUM(CASE WHEN ${orders.invoiceDueAt} IS NOT NULL AND ${orders.invoiceDueAt} < date('now') THEN ${orders.totalCents} ELSE 0 END), 0)`,
       })
       .from(orders)
       .where(and(
@@ -52,6 +54,9 @@ async function AdminPortal() {
       initialApplications={applications}
       initialOutstanding={Object.fromEntries(
         balances.map((row) => [row.applicationId, Number(row.outstandingCents || 0)]),
+      )}
+      initialOverdue={Object.fromEntries(
+        balances.map((row) => [row.applicationId, Number(row.overdueCents || 0)]),
       )}
       initialShipping={shipping}
       user={{ displayName: "Dallas Bakery Owner", email: session.email }}

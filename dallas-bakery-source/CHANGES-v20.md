@@ -3,40 +3,29 @@
 Everything in this round was verified live against a seeded local site:
 account orders placed and recorded, over-limit orders refused with the right
 amount, invoices marked paid, account orders cancelled, credit limits and
-exclusive prices set and cleared from /admin — plus 87 automated tests
-(75 site, 9 buyer app, 3 owner app), lint, typecheck, and a production build.
+exclusive prices set and cleared from /admin — plus 89 automated tests
+(77 site, 9 buyer app, 3 owner app), lint, typecheck, and a production build.
 
-## Credit terms (order on account)
+## Net terms (order on account)
 
-- **Granting credit.** Approving an application now asks whether to give the
-  buyer a credit limit (dollars; 0 keeps them card-only) and **Net 15 or
-  Net 30** payment terms — only the customers the owner chooses get terms.
-  Every card (pending applications included, so terms can be set before
-  approval) carries a **Credit terms** editor showing
-  Net terms / limit / outstanding / available — all changeable at any time.
-  Each account order stamps its invoice due date at order time (order date
-  plus the net days), so a later terms change never moves an existing
-  invoice; the queue shows the due date and flags unpaid past-due invoices
-  **OVERDUE**, and the buyer sees the due date at confirmation, in email,
-  and in order history.
+- **Net 15 / Net 30 is the account.** The owner puts a chosen business on
+  net terms and sets its **net limit** — the most it can owe at once; the
+  limit is attached to the terms, so card-only businesses have neither.
+  Approval asks terms first (30 / 15 / 0 for card-only), then the limit;
+  both are settable on pending applications (live at approval) and
+  editable any time in the card's Net terms box (Card only / Net 15 /
+  Net 30 + net limit). Stored coherently: terms always carry a limit and
+  a limit always carries terms.
   Database: `credit_limit_cents` + `credit_terms_days` on
   `wholesale_applications`, `invoice_due_at` on `orders`
   (migrations `0012`, `0013`).
-- **Ordering without a card.** Buyers with credit check out on account by
-  default: **"Place order on account"** is the primary button on the website
-  portal and in the app's payment screen (with how much credit is left), and
-  they are never asked for a card — **"Pay by card instead"** sits underneath
-  as the optional path, becoming required only when an order is over the
-  available credit. The endpoint (`POST /api/buyer/order-on-account`) prices the same
-  cart server-side (exclusive prices included), checks it against available
-  credit, and records the order immediately with `payment_terms='account'`
-  — no Stripe object exists for it. The response carries the recorded
-  order, so confirmation screens show the order number instantly with no
-  webhook polling. The balance can never pass the limit: an order over the
-  available credit is refused with the exact amount left and told the way
-  forward (pay the open invoice balance, or pay by card), and a re-check
-  after recording removes an order that a simultaneous request would have
-  pushed past the limit. The refusal is a 400, never a session-expiry code.
+- **Past due locks the account.** The credit state now carries the overdue
+  slice of the balance (unpaid past its due date). While it is above zero,
+  on-account ordering is refused server-side and both checkouts switch to
+  card with a past-due notice ("pay by card until it's settled"); the
+  portal banner turns red, and the admin card shows "Past due $X — locked
+  to card". Marking the overdue invoices paid in the shipping queue
+  reopens the account instantly. Verified live end to end.
 - **Outstanding balance.** Unpaid account orders (not refunded, invoice not
   marked paid) sum into the buyer's outstanding balance; available credit is
   limit minus outstanding, floored at zero. Pure arithmetic lives in
@@ -93,7 +82,7 @@ exclusive prices set and cleared from /admin — plus 87 automated tests
 
 ## Numbers
 
-- Tests: 75 site + 9 buyer app + 3 owner app, all green.
+- Tests: 77 site + 9 buyer app + 3 owner app, all green.
 - No client ever sends money amounts; credit checks and exclusive prices are
   entirely server-side, so a patched app can neither change a price nor
   exceed its credit line.

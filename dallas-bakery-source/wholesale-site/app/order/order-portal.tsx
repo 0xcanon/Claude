@@ -26,6 +26,8 @@ type Credit = {
   availableCents: number;
   /** 15 or 30 for Net terms; 0 when the account has none. */
   termsDays: number;
+  /** The slice of the balance past its due date — locks on-account ordering. */
+  overdueCents: number;
 };
 
 type Location = {
@@ -537,14 +539,23 @@ export function OrderPortal() {
       )}
 
       {credit?.enabled && (
-        <p className="buyer-credit-banner">
-          <strong>Credit account{credit.termsDays ? ` · Net ${credit.termsDays}` : ""}.</strong>{" "}
-          {money(credit.availableCents)} available of your {money(credit.limitCents)} limit
-          {credit.outstandingCents > 0
-            ? <> — {money(credit.outstandingCents)} on open invoices.</>
-            : "."}{" "}
-          Orders on account are invoiced; no card needed.
-        </p>
+        credit.overdueCents > 0 ? (
+          <p className="buyer-credit-banner past-due" role="alert">
+            <strong>Net {credit.termsDays || 15} account — past due.</strong>{" "}
+            {money(credit.overdueCents)} of your invoice balance is past its due
+            date, so new orders need a card until it&apos;s settled. Questions?
+            sales@dallasbakery.com · (469) 729-4706.
+          </p>
+        ) : (
+          <p className="buyer-credit-banner">
+            <strong>Net {credit.termsDays || 15} account.</strong>{" "}
+            {money(credit.availableCents)} available of your {money(credit.limitCents)} net limit
+            {credit.outstandingCents > 0
+              ? <> — {money(credit.outstandingCents)} on open invoices.</>
+              : "."}{" "}
+            Orders on account are invoiced; no card needed.
+          </p>
+        )
       )}
 
       <div className="buyer-shop-body">
@@ -612,7 +623,7 @@ export function OrderPortal() {
             One case ships as one box at {money(shipping.rateCents)}. No sales tax on bakery items.
             {rules ? ` ${rules.minimumLabel} minimum. Delivery in ${rules.leadTimeLabel}.` : ""}
           </small>
-          {credit?.enabled && caseCount > 0 && subtotalCents + shippingCents <= credit.availableCents ? (
+          {credit?.enabled && credit.overdueCents === 0 && caseCount > 0 && subtotalCents + shippingCents <= credit.availableCents ? (
             /* A buyer with credit defaults to their account — no card asked
                for. Card stays one click away for whoever prefers it. */
             <>
@@ -633,13 +644,17 @@ export function OrderPortal() {
               <button type="button" disabled={busy || accountBusy || !caseCount} onClick={checkout}>
                 {busy ? "Preparing…" : "Continue to payment"}
               </button>
-              {credit?.enabled && caseCount > 0 && subtotalCents + shippingCents > credit.availableCents && (
+              {credit?.enabled && caseCount > 0 && credit.overdueCents > 0 ? (
+                <small className="buyer-credit-short">
+                  Your Net {credit.termsDays || 15} balance is past due ({money(credit.overdueCents)} overdue) — pay this order by card. Your account reopens once the past-due balance is settled.
+                </small>
+              ) : credit?.enabled && caseCount > 0 && subtotalCents + shippingCents > credit.availableCents ? (
                 <small className="buyer-credit-short">
                   {credit.outstandingCents > 0
                     ? `This order is over your available credit (${money(credit.availableCents)} left). Pay your open invoice balance (${money(credit.outstandingCents)}) to free up credit, or pay this order by card.`
-                    : `This order is over your ${money(credit.limitCents)} credit limit, so it needs a card — or place a smaller order on account.`}
+                    : `This order is over your ${money(credit.limitCents)} net limit, so it needs a card — or place a smaller order on account.`}
                 </small>
-              )}
+              ) : null}
             </>
           )}
           {error && <p className="buyer-error" role="alert">{error}</p>}

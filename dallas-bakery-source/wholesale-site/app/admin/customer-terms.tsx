@@ -24,6 +24,8 @@ type CreditProps = {
   /** Net terms in days: 15, 30, or 0 for none. */
   creditTermsDays: number;
   outstandingCents: number;
+  /** The slice of the outstanding balance past its due date. */
+  overdueCents: number;
   /** True while the application is still pending — terms set now apply the
    *  moment the account is approved. */
   pending?: boolean;
@@ -31,9 +33,12 @@ type CreditProps = {
   onSave: (creditLimitCents: number, creditTermsDays: number) => Promise<string | null>;
 };
 
-export function CreditTerms({ creditLimitCents, creditTermsDays, outstandingCents, pending, onSave }: CreditProps) {
-  const [limitDollars, setLimitDollars] = useState((creditLimitCents / 100).toFixed(2));
-  const [termsDays, setTermsDays] = useState(creditTermsDays === 30 ? 30 : 15);
+export function CreditTerms({ creditLimitCents, creditTermsDays, outstandingCents, overdueCents, pending, onSave }: CreditProps) {
+  const onTerms = creditTermsDays === 15 || creditTermsDays === 30;
+  const [terms, setTerms] = useState<0 | 15 | 30>(onTerms ? (creditTermsDays as 15 | 30) : 0);
+  const [limitDollars, setLimitDollars] = useState(
+    creditLimitCents > 0 ? (creditLimitCents / 100).toFixed(2) : "",
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -43,84 +48,105 @@ export function CreditTerms({ creditLimitCents, creditTermsDays, outstandingCent
   const [lastSeenLimit, setLastSeenLimit] = useState(creditLimitCents);
   if (lastSeenLimit !== creditLimitCents) {
     setLastSeenLimit(creditLimitCents);
-    setLimitDollars((creditLimitCents / 100).toFixed(2));
+    setLimitDollars(creditLimitCents > 0 ? (creditLimitCents / 100).toFixed(2) : "");
   }
   const [lastSeenDays, setLastSeenDays] = useState(creditTermsDays);
   if (lastSeenDays !== creditTermsDays) {
     setLastSeenDays(creditTermsDays);
-    setTermsDays(creditTermsDays === 30 ? 30 : 15);
+    setTerms(creditTermsDays === 15 || creditTermsDays === 30 ? (creditTermsDays as 15 | 30) : 0);
   }
 
   const available = Math.max(0, creditLimitCents - outstandingCents);
-  const termsLabel = creditTermsDays === 30 ? "Net 30" : creditTermsDays === 15 ? "Net 15" : "";
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
+    if (terms === 0) {
+      setSaving(true);
+      const problem = await onSave(0, 0);
+      setSaving(false);
+      if (problem) setError(problem);
+      else setMessage("Saved. This buyer pays by card only.");
+      return;
+    }
     const dollars = Number(limitDollars);
-    if (!limitDollars.trim() || !Number.isFinite(dollars) || dollars < 0) {
-      setError("Enter a dollar amount — 0 turns credit off.");
+    if (!limitDollars.trim() || !Number.isFinite(dollars) || dollars <= 0) {
+      setError(`Enter the most they can owe on Net ${terms} — their net limit.`);
       return;
     }
     setSaving(true);
-    const problem = await onSave(Math.round(dollars * 100), dollars > 0 ? termsDays : 0);
+    const problem = await onSave(Math.round(dollars * 100), terms);
     setSaving(false);
     if (problem) {
       setError(problem);
     } else {
-      setMessage(dollars > 0
-        ? `Saved — Net ${termsDays}. This buyer can order on account, up to their available credit${pending ? ", as soon as you approve them" : ""}.`
-        : "Saved. This buyer pays by card only.");
+      setMessage(`Saved — Net ${terms} with a ${money(Math.round(dollars * 100))} net limit${pending ? ", live the moment you approve them" : ""}. They order without a card and you invoice them.`);
     }
   }
 
   return (
-    <section className="admin-credit" aria-label="Credit terms">
+    <section className="admin-credit" aria-label="Net terms">
       <div className="admin-credit-summary">
-        <p className="admin-kicker">Credit terms</p>
-        {creditLimitCents > 0 ? (
-          <p>
-            {termsLabel && <><strong>{termsLabel}</strong> · </>}
-            Limit <strong>{money(creditLimitCents)}</strong> · Outstanding{" "}
-            <strong>{money(outstandingCents)}</strong> · Available{" "}
-            <strong>{money(available)}</strong>
-            {pending ? " — active once approved." : ""}
-          </p>
+        <p className="admin-kicker">Net terms</p>
+        {onTerms && creditLimitCents > 0 ? (
+          <>
+            <p>
+              <strong>Net {creditTermsDays}</strong> · Net limit{" "}
+              <strong>{money(creditLimitCents)}</strong> · Outstanding{" "}
+              <strong>{money(outstandingCents)}</strong> · Available{" "}
+              <strong>{money(available)}</strong>
+              {pending ? " — active once approved." : ""}
+            </p>
+            {overdueCents > 0 && (
+              <p className="admin-credit-overdue" role="alert">
+                Past due <strong>{money(overdueCents)}</strong> — their account is
+                locked to card until you mark the overdue invoices paid in the
+                shipping queue.
+              </p>
+            )}
+          </>
         ) : (
           <p>
-            Card only. Give this buyer a credit limit and Net 15 or Net 30 terms
-            and they can place orders without a card — you invoice them and mark
-            it paid in the shipping queue.
+            Card only. Put this buyer on Net 15 or Net 30 and set their net
+            limit — the most they can owe at once — and they order without a
+            card; you invoice them and mark it paid in the shipping queue.
             {pending ? " Set it now and it applies the moment you approve them." : ""}
           </p>
         )}
       </div>
       <form onSubmit={save}>
         <label>
-          <span>Credit limit</span>
-          <span className="admin-money-input"><b>$</b><input
-            aria-label="Credit limit in dollars"
-            inputMode="decimal"
-            min="0"
-            max="250000"
-            step="0.01"
-            value={limitDollars}
-            onChange={(event) => setLimitDollars(event.target.value)}
-          /></span>
-        </label>
-        <label>
           <span>Payment terms</span>
           <select
             aria-label="Net payment terms"
-            value={termsDays}
-            onChange={(event) => setTermsDays(Number(event.target.value) === 30 ? 30 : 15)}
+            value={terms}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              setTerms(value === 15 ? 15 : value === 30 ? 30 : 0);
+            }}
           >
+            <option value={0}>Card only</option>
             <option value={15}>Net 15</option>
             <option value={30}>Net 30</option>
           </select>
         </label>
-        <button disabled={saving} type="submit">{saving ? "Saving…" : "Save credit terms"}</button>
+        {terms !== 0 && (
+          <label>
+            <span>Net limit</span>
+            <span className="admin-money-input"><b>$</b><input
+              aria-label={`Maximum owed on Net ${terms}, in dollars`}
+              inputMode="decimal"
+              min="0"
+              max="250000"
+              step="0.01"
+              placeholder="1500.00"
+              value={limitDollars}
+              onChange={(event) => setLimitDollars(event.target.value)}
+            /></span>
+          </label>
+        )}
+        <button disabled={saving} type="submit">{saving ? "Saving…" : "Save net terms"}</button>
       </form>
       {error && <p className="admin-error" role="alert">{error}</p>}
       {message && <p className="admin-credit-saved" role="status">{message}</p>}

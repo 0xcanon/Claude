@@ -43,13 +43,27 @@ export async function updateWholesaleApplication(input: UpdateInput) {
 
   const statusChanged = current.status !== input.status;
 
+  // Net terms are the account and the net limit attaches to them, so the
+  // stored pair is always coherent: card-only is (no terms, no limit), and
+  // Net 15/30 always carries a limit. Explicitly choosing card-only clears
+  // the limit; a limit granted without a terms choice starts on Net 15; and
+  // terms can never stand without a limit.
+  let creditPair: { creditLimitCents: number; creditTermsDays: number } | undefined;
+  if (input.creditLimitCents !== undefined || input.creditTermsDays !== undefined) {
+    let limit = input.creditLimitCents ?? current.creditLimitCents;
+    let days = input.creditTermsDays ?? current.creditTermsDays;
+    if (input.creditTermsDays === 0) limit = 0;
+    if (limit > 0 && days === 0) days = 15;
+    if (limit === 0) days = 0;
+    creditPair = { creditLimitCents: limit, creditTermsDays: days };
+  }
+
   const [application] = await getDb()
     .update(wholesaleApplications)
     .set({
       status: input.status,
       ownerNotes: input.ownerNotes,
-      ...(input.creditLimitCents === undefined ? {} : { creditLimitCents: input.creditLimitCents }),
-      ...(input.creditTermsDays === undefined ? {} : { creditTermsDays: input.creditTermsDays }),
+      ...(creditPair || {}),
       decidedBy: input.status === "pending" ? "" : input.adminEmail,
       decidedAt: input.status === "pending" ? null : new Date().toISOString(),
       updatedAt: sql`CURRENT_TIMESTAMP`,

@@ -877,6 +877,9 @@ footer { color: var(--cream); background: var(--ink); }
   margin: 0.8rem 0 0; font-size: 0.84rem; padding: 0.8rem 1rem;
   border-left: 3px solid var(--sage); background: rgba(105, 114, 88, 0.1); color: #3d5740;
 }
+.buyer-credit-banner.past-due {
+  border-left-color: #9a3524; background: rgba(154, 53, 36, 0.09); color: #7c2a1c;
+}
 
 .buyer-shop-body {
   display: grid; grid-template-columns: minmax(0, 1fr) 21rem;
@@ -1175,6 +1178,7 @@ a.admin-tracking { display: block; color: var(--tomato); font-size: 0.72rem; }
 .admin-credit form button { font: inherit; font-size: 0.75rem; letter-spacing: 0.06em; padding: 0.6rem 1rem; border: 1px solid var(--ink); background: var(--ink); color: var(--cream); cursor: pointer; }
 .admin-credit form button:disabled { opacity: 0.5; cursor: not-allowed; }
 .admin-credit-saved { flex-basis: 100%; margin: 0; font-size: 0.75rem; color: #3d5a2f; }
+.admin-credit-overdue { margin-top: 0.4rem; font-size: 0.8rem; color: #9a3524; }
 
 /* Exclusive per-customer pricing on an approved application card. */
 .admin-exclusive { margin-top: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--line); background: var(--cream); }

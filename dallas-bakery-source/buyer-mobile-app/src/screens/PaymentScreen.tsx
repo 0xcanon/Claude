@@ -46,9 +46,12 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
 
   const summary: OrderSummary = payment.summary;
   const deliverTo = payment.deliverTo;
-  // A buyer with credit defaults to their account — the card sheet only
-  // opens if they choose it, or if the order is over their available credit.
+  // A buyer on net terms defaults to their account — the card sheet only
+  // opens if they choose it, if the order is over their available credit,
+  // or if a past-due balance has locked the account to card.
+  const overdueCents = credit?.overdueCents ?? 0;
   const accountFirst = Boolean(credit?.enabled && onOrderOnAccount)
+    && overdueCents === 0
     && summary.totalCents <= (credit?.availableCents ?? 0);
 
   return (
@@ -121,7 +124,7 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
               onPress={onOrderOnAccount}
             />
             <Text style={styles.accountFirstHint}>
-              {money(credit.availableCents)} of your {money(credit.limitCents)} credit available · invoiced{credit.termsDays ? ` on Net ${credit.termsDays}` : ""}, not charged
+              {money(credit.availableCents)} of your {money(credit.limitCents)} available on your Net {credit.termsDays || 15} account · invoiced, not charged
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -143,13 +146,17 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
               loading={paying}
               onPress={onPay}
             />
-            {credit?.enabled && onOrderOnAccount && summary.totalCents > credit.availableCents && (
+            {credit?.enabled && onOrderOnAccount && overdueCents > 0 ? (
+              <Text style={styles.accountShort}>
+                Your Net {credit.termsDays || 15} balance is past due ({money(overdueCents)} overdue) — pay this order by card. Your account reopens once the past-due balance is settled.
+              </Text>
+            ) : credit?.enabled && onOrderOnAccount && summary.totalCents > credit.availableCents ? (
               <Text style={styles.accountShort}>
                 {credit.outstandingCents > 0
                   ? `This order is over your available credit (${money(credit.availableCents)} left). Pay your open invoice balance (${money(credit.outstandingCents)}) to free up credit, or pay this order by card.`
-                  : `This order is over your ${money(credit.limitCents)} credit limit, so it needs a card — or place a smaller order on account.`}
+                  : `This order is over your ${money(credit.limitCents)} net limit, so it needs a card — or place a smaller order on account.`}
               </Text>
-            )}
+            ) : null}
           </>
         )}
         <Text style={styles.note}>
