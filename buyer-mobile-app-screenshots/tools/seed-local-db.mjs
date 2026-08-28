@@ -47,4 +47,15 @@ for (const o of orders) {
 }
 console.log('orders seeded:', db.prepare('SELECT COUNT(*) c FROM orders').get().c);
 console.log('application:', db.prepare('SELECT status FROM wholesale_applications WHERE email=?').get(EMAIL));
+
+// A second approved delivery location, so the checkout shows the picker.
+db.exec(`DELETE FROM buyer_locations`);
+db.exec(`INSERT INTO buyer_locations (id, application_id, name, street, street2, city, state, zip, active)
+         VALUES ('loc-plano', 'app_7Yh2', 'Saffron Kitchen — Plano', '4400 Legacy Dr', '', 'Plano', 'TX', '75024', 1)`);
+
+// A standing weekly order, so the portal shows the card.
+db.exec(`DELETE FROM standing_orders`);
+db.exec(`INSERT INTO standing_orders (application_id, email, weekday, lines, location_id, active, last_run_date, last_run_status)
+         VALUES ('app_7Yh2', '${EMAIL}', 2, 'WS-BARBARI-25:2|WS-NATURAL-25:1', 'app_7Yh2', 1, '2026-08-25', 'charged')`);
+console.log('locations + standing order seeded');
 db.close();

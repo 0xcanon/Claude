@@ -14,7 +14,7 @@ patches that produced them.
 | `screens/website-contact-sheet.png` | The website and admin screens on one sheet |
 | `patches/premium-launch.patch` | The current change, 76 files |
 | `tools/` | Capture harness, fixtures, and the local-database seed |
-| `CHANGES-v16.md`, `CHANGES-v17.md` | Release notes |
+| `CHANGES-v16.md` … `CHANGES-v18.md` | Release notes |
 
 ## Pricing
 
@@ -61,7 +61,7 @@ mkdir -p wholesale-site/public/images
 cp <case.jpg> wholesale-site/public/images/case.jpg   # binary, ships beside the patch
 ```
 
-See `CHANGES-v17.md` for the full write-up. Headlines:
+See `CHANGES-v17.md` and `CHANGES-v18.md` for the full write-ups. Headlines:
 
 - **Order tracking** — one shared vocabulary (Baking / Packed / Shipped) across
   app, website, and admin. Tracking is offered only once a parcel has actually
@@ -75,10 +75,15 @@ See `CHANGES-v17.md` for the full write-up. Headlines:
   photography (the catalog previously pointed at four image paths that did not
   exist), per-case pricing copy throughout.
 - **Fixed a hydration mismatch** on `/order` introduced in v16.
+- **v18** — owner alert + buyer confirmation emails on every order, an admin
+  bake sheet with print view, one-click full refunds, CSV export, weekly
+  revenue, saved cards on both surfaces, owner-approved multi-location
+  delivery, and standing weekly orders charged off-session by a daily cron.
+  Migration `0010` must run before deploy.
 
 ### Verification
 
-53 unit tests pass (41 site, 9 buyer, 3 owner), TypeScript clean in all three
+62 unit tests pass (50 site, 9 buyer, 3 owner), TypeScript clean in all three
 projects, the site lints and builds — re-run against a fresh unzip of v15 with
 the patch applied, not just the working tree.
 
