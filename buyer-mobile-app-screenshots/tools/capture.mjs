@@ -23,9 +23,12 @@ const screens = [
   ['09-catalog',           'catalog'],
   ['10-product-detail',    'product'],
   ['11-cart',              'cart'],
-  ['12-orders',            'orders'],
-  ['13-locations',         'locations'],
-  ['14-account',           'account'],
+  ['12-payment',           'pay'],
+  ['13-order-success',     'order-success'],
+  ['14-order-settling',    'order-settling'],
+  ['15-orders',            'orders'],
+  ['16-locations',         'locations'],
+  ['17-account',           'account'],
 ];
 
 const browser = await chromium.launch({

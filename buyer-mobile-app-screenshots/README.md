@@ -1,30 +1,27 @@
-# Dallas Bakery buyer app — screenshots
+# Dallas Bakery buyer app — screens and change log
 
-Screenshots of every screen in `buyer-mobile-app` from
-`Dallas-Bakery-Wholesale-Launch-Source-v15`, captured from the app actually
-running under `npx expo start`.
+Screenshots of every screen in `buyer-mobile-app`, captured from the app
+actually running under `npx expo start`, plus the patches that produced them.
 
 ## What's here
 
-| Folder | Contents |
+| Path | Contents |
 |---|---|
-| `screens/phone/` | 14 screens at 390×844 @3x (1170×2532 — iPhone 14 Pro), the true device frame |
+| `screens/phone/` | 17 screens at 390x844 @3x (1170x2532 - iPhone 14 Pro), the true device frame |
 | `screens/full/` | The same screens at full scroll length, so nothing below the fold is cut |
-| `screens/contact-sheet.png` | All 14 screens on one sheet |
-| `tools/` | The harness used to produce them |
+| `screens/contact-sheet.png` | All 17 on one sheet |
+| `patches/case-stripe-launch.patch` | The current change: per-case shipping, Shopify removal, card payments |
+| `tools/` | The harness used to capture the screens |
+| `CHANGES-v16.md` | Release notes for the patch |
 
-Screens: welcome · apply step 1 · apply step 2 · status (pending) ·
-status (approved) · sign-in (email) · sign-in (code) · home · catalog ·
-product detail · cart · orders · locations · account.
-
-The captures show the app **after** the case-pricing change in
-`patches/case-pricing.patch` — bread is priced and ordered by the case
-($50.00 per case, 25 loaves, $2.00 a loaf), not by the loaf in increments
-of 25.
+Screens: welcome, apply step 1, apply step 2, status (pending), status
+(approved), sign-in (email), sign-in (code), home, catalog, product detail,
+cart, **payment**, **order success**, **order settling**, orders, locations,
+account.
 
 ## How they were made
 
-`expo start` alone only serves the Metro bundler — there is no device in CI to
+`expo start` alone only serves the Metro bundler - there is no device in CI to
 photograph. So the app is rendered through Expo's web target and captured with
 headless Chromium at a phone viewport.
 
@@ -37,65 +34,44 @@ node capture.mjs          # from tools/, with playwright installed
 ```
 
 `tools/App.harness.tsx` replaces `App.tsx` (the original is kept alongside it as
-`App.original.tsx`, and is re-exported when no `?screen=` parameter is present).
+`App.original.tsx` and re-exported when no `?screen=` parameter is present).
 With `?screen=<name>` it mounts a single screen against the fixture data in
-`tools/screenshot-fixtures.ts`, so authenticated screens — catalog, cart,
-orders, account — can be captured without a live Shopify backend or an approved
-buyer session. No screen component was modified.
+`tools/screenshot-fixtures.ts`, so screens behind sign-in and payment can be
+captured without a live backend or a real card. No screen component is
+modified.
 
-## Note on one web-only rendering difference
+Stripe's PaymentSheet is a native module, so the card sheet itself cannot be
+rendered on the web target. `12-payment` is the review screen that precedes it
+and `13-order-success` is the confirmation that follows - both are the app's
+own screens.
 
-`ProductCard`'s image uses `{ width: "100%", aspectRatio: 1.28 }`. Yoga applies
-that correctly on iOS/Android, but `react-native-web` resolves the height
-against the stretched flex row instead of the image's own width, which made
-catalog tiles render ~4.5× too tall in the browser. The capture script injects a
-one-line CSS correction so the screenshots match on-device layout. This is a
-`react-native-web` artifact only — it does not affect the shipping app, which
-never runs on web.
+## patches/case-stripe-launch.patch
 
-The `Switch` on apply step 2 also draws with the browser's default thumb colour
-rather than `colors.paper`, for the same reason.
+64 files across `wholesale-site`, `buyer-mobile-app`, and `owner-mobile-app`.
+Apply to a clean v15 tree with `patch -p1 < patches/case-stripe-launch.patch`.
+See `CHANGES-v16.md` for the full write-up. In short:
 
-## Fixture data
+- **Shipping is billed per case.** `priceCart` sets `boxCount = caseCount`
+  rather than dividing loaves by the retail box size, so three cases is always
+  three boxes at $12.50 = $37.50. The app mirrors it exactly.
+- **Shopify is gone** from every running path: the B2B module, the setup guide,
+  the carrier-rate callback, the hosted-checkout route, the four
+  `shopify_*` columns (migration `0009`), `COMMERCE_PLATFORM`, the owner app's
+  store-sync UI, and four dead `EXPO_PUBLIC_*` values that would have failed
+  every signed build.
+- **Card payments on both surfaces.** `POST /api/buyer/payment-intent` prices
+  the cart server-side; the site collects the card with Stripe's Payment
+  Element and the app with Stripe's PaymentSheet; both then show a real order
+  confirmation fed by `GET /api/buyer/order-status`. The webhook records
+  `payment_intent.succeeded`, re-pricing through the same `priceCart` that set
+  the charge.
 
-All names, addresses, order numbers, and the sign-in code are invented sample
-data (`Saffron Kitchen Group`, `mina@saffronkitchen.com`). Shipping defaults
-($12.50 per 25-unit box) match the app's own `DEFAULT_SHIPPING`.
+### Verification
 
+49 unit tests pass (37 site, 9 buyer, 3 owner), TypeScript is clean in all
+three projects, the site lints clean, and `npm run build` succeeds - all
+re-run against a fresh unzip of v15 with the patch applied, not just the
+working tree.
 
-## `patches/case-pricing.patch`
-
-Converts the buyer app's pricing and quantity UI from loaves to cases.
-Apply to a clean v15 tree with `patch -p1 < patches/case-pricing.patch`;
-11 files, +209/−46.
-
-The server was already case-based: `/api/buyer/catalog` sends the price of a
-whole case as `variant.price.amount` with `quantityRule: { minimum: 1,
-increment: 1 }`, and `/api/buyer/checkout` takes `{ sku, cases }`. Only the
-mobile UI still read those numbers as loaves, so this brings the app in line
-with the contract the website's order portal already follows.
-
-What changed:
-
-- **Product card / detail** — "$50.00 per case" with "25 loaves · $2.00 each"
-  underneath; the stepper counts cases (1, 2, 3), not loaves (25, 50, 75).
-- **Cart** — lines read "2 cases × $50.00 / 50 loaves"; the subtotal row
-  names the case count.
-- **Catalog / home / welcome** — cart button reads "VIEW CART · 3 CASES";
-  home shows the real cheapest case price from the buyer's own catalog
-  (labelled FROM when cases are not all one price) instead of a hardcoded
-  `$2.50`.
-- **`format.ts`** — adds `loavesPerCase`, `loafPrice`, `cartLoaves`,
-  `caseLabel`, `loafLabel`, and documents that cart quantities are cases.
-- **`wholesale-catalog.ts`** — `catalogForClients()` now publishes
-  `unitsPerCase`, so the app reads the case size instead of assuming 25.
-  The app still falls back to 25 when the field is absent.
-
-### Shipping bug fixed along the way
-
-`CartScreen` passed the **case count** to `shippingEstimate`, which bills per
-box of **loaves**. With `unitsPerBox: 25`, a 3-case order estimated
-`ceil(3/25)` = 1 box ($12.50) while the server's `priceCart` charged
-`ceil(75/25)` = 3 boxes ($37.50) — the buyer saw $25.00 less than they were
-charged. The cart now converts to loaves first with `cartLoaves`, and a
-regression test pins both the correct result and the old wrong one.
+Not verified: no live Stripe call was made, because that needs
+`STRIPE_SECRET_KEY`. Place one real card order on each surface before launch.

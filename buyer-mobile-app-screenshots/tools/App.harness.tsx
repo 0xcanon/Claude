@@ -1,7 +1,7 @@
 // Screenshot harness. `App.original.tsx` is the shipping app, untouched.
 // With no ?screen= query parameter this renders the real app; with one it
 // mounts a single screen against fixture data so every state can be captured
-// without a live Shopify backend.
+// without a live backend.
 import { useState } from "react";
 import { StatusBar } from "expo-status-bar";
 
@@ -13,7 +13,9 @@ import { CartScreen } from "./src/screens/CartScreen";
 import { CatalogScreen } from "./src/screens/CatalogScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { LocationsScreen } from "./src/screens/LocationsScreen";
+import { OrderSuccessScreen } from "./src/screens/OrderSuccessScreen";
 import { OrdersScreen } from "./src/screens/OrdersScreen";
+import { PaymentScreen } from "./src/screens/PaymentScreen";
 import { ProductDetailScreen } from "./src/screens/ProductDetailScreen";
 import { SignInScreen } from "./src/screens/SignInScreen";
 import { WelcomeScreen } from "./src/screens/WelcomeScreen";
@@ -159,6 +161,46 @@ export default function App() {
             products={fx.products}
             selectedLocationId={locationId}
             shipping={fx.shipping}
+          />
+        </>
+      );
+    case "pay":
+      return (
+        <>
+          <StatusBar style="light" />
+          <PaymentScreen error="" onBack={noop} onPay={noop} paying={false} payment={fx.payment} />
+        </>
+      );
+    case "pay-loading":
+      return (
+        <>
+          <StatusBar style="light" />
+          <PaymentScreen error="" onBack={noop} onPay={noop} paying={false} payment={null} />
+        </>
+      );
+    case "order-success":
+      return (
+        <>
+          <StatusBar style="dark" />
+          <OrderSuccessScreen
+            cutoffLabel="Ordered before noon Central, so it bakes and ships today."
+            onDone={noop}
+            onViewOrders={noop}
+            order={fx.confirmedOrder}
+            settling={false}
+          />
+        </>
+      );
+    case "order-settling":
+      return (
+        <>
+          <StatusBar style="dark" />
+          <OrderSuccessScreen
+            cutoffLabel=""
+            onDone={noop}
+            onViewOrders={noop}
+            order={null}
+            settling
           />
         </>
       );
