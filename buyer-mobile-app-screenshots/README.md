@@ -1,77 +1,86 @@
-# Dallas Bakery buyer app — screens and change log
+# Dallas Bakery wholesale — screens and change log
 
-Screenshots of every screen in `buyer-mobile-app`, captured from the app
-actually running under `npx expo start`, plus the patches that produced them.
+Screens from the buyer app, the website, and the owner admin panel, plus the
+patches that produced them.
 
 ## What's here
 
 | Path | Contents |
 |---|---|
-| `screens/phone/` | 17 screens at 390x844 @3x (1170x2532 - iPhone 14 Pro), the true device frame |
-| `screens/full/` | The same screens at full scroll length, so nothing below the fold is cut |
-| `screens/contact-sheet.png` | All 17 on one sheet |
-| `patches/case-stripe-launch.patch` | The current change: per-case shipping, Shopify removal, card payments |
-| `tools/` | The harness used to capture the screens |
-| `CHANGES-v16.md` | Release notes for the patch |
+| `screens/phone/` | 19 app screens at 390x844 @3x (iPhone 14 Pro), true device frame |
+| `screens/full/` | The same screens at full scroll length |
+| `screens/contact-sheet.png` | All 19 app screens on one sheet |
+| `screens/website/` | 7 website + admin screens at 1440px @2x |
+| `screens/website-contact-sheet.png` | The website and admin screens on one sheet |
+| `patches/premium-launch.patch` | The current change, 76 files |
+| `tools/` | Capture harness, fixtures, and the local-database seed |
+| `CHANGES-v16.md`, `CHANGES-v17.md` | Release notes |
 
-Screens: welcome, apply step 1, apply step 2, status (pending), status
-(approved), sign-in (email), sign-in (code), home, catalog, product detail,
-cart, **payment**, **order success**, **order settling**, orders, locations,
-account.
+## Pricing
 
-## How they were made
+$2.50 a loaf, sesame $1.80. A 25-loaf case is **$62.50**; sesame **$45.00**.
+Shipping is **per case** — one case is one box at $12.50, so three cases is
+three boxes at $37.50.
 
-`expo start` alone only serves the Metro bundler - there is no device in CI to
-photograph. So the app is rendered through Expo's web target and captured with
-headless Chromium at a phone viewport.
+## How the screens were made
 
-```bash
-cd buyer-mobile-app
-npm ci
-npx expo install react-dom react-native-web @expo/metro-runtime
-npx expo start --web --port 8081
-node capture.mjs          # from tools/, with playwright installed
-```
-
-`tools/App.harness.tsx` replaces `App.tsx` (the original is kept alongside it as
-`App.original.tsx` and re-exported when no `?screen=` parameter is present).
-With `?screen=<name>` it mounts a single screen against the fixture data in
-`tools/screenshot-fixtures.ts`, so screens behind sign-in and payment can be
-captured without a live backend or a real card. No screen component is
+**App** — `expo start` only serves the Metro bundler, so the app is rendered
+through Expo's web target and captured with headless Chromium at a phone
+viewport. `tools/App.harness.tsx` replaces `App.tsx` (the original is kept as
+`App.original.tsx` and re-exported when no `?screen=` is present) and mounts one
+screen at a time against `tools/screenshot-fixtures.ts`. No screen component is
 modified.
 
-Stripe's PaymentSheet is a native module, so the card sheet itself cannot be
-rendered on the web target. `12-payment` is the review screen that precedes it
-and `13-order-success` is the confirmation that follows - both are the app's
-own screens.
+**Website and admin** — captured from the site actually running under
+`npm run dev`, against a local database seeded by `tools/seed-local-db.mjs`
+(one approved buyer, three orders spanning the three shipping stages, one admin
+account). The prices, totals, and tracking states in those screens are computed
+by the real code, not mocked.
 
-## patches/case-stripe-launch.patch
+```bash
+cd wholesale-site && npm ci
+node ../tools/seed-local-db.mjs      # writes .wrangler local D1
+npm run dev
+node ../tools/capture-website.mjs
+node ../tools/capture-admin.mjs
+```
 
-64 files across `wholesale-site`, `buyer-mobile-app`, and `owner-mobile-app`.
-Apply to a clean v15 tree with `patch -p1 < patches/case-stripe-launch.patch`.
-See `CHANGES-v16.md` for the full write-up. In short:
+Stripe's card UI is not in these screens: the web Payment Element and the app's
+PaymentSheet both need a live PaymentIntent, which needs `STRIPE_SECRET_KEY`.
+`12-payment` is the app's own review screen and `13-order-success` is its
+confirmation; both are Dallas Bakery screens, not Stripe's.
 
-- **Shipping is billed per case.** `priceCart` sets `boxCount = caseCount`
-  rather than dividing loaves by the retail box size, so three cases is always
-  three boxes at $12.50 = $37.50. The app mirrors it exactly.
-- **Shopify is gone** from every running path: the B2B module, the setup guide,
-  the carrier-rate callback, the hosted-checkout route, the four
-  `shopify_*` columns (migration `0009`), `COMMERCE_PLATFORM`, the owner app's
-  store-sync UI, and four dead `EXPO_PUBLIC_*` values that would have failed
-  every signed build.
-- **Card payments on both surfaces.** `POST /api/buyer/payment-intent` prices
-  the cart server-side; the site collects the card with Stripe's Payment
-  Element and the app with Stripe's PaymentSheet; both then show a real order
-  confirmation fed by `GET /api/buyer/order-status`. The webhook records
-  `payment_intent.succeeded`, re-pricing through the same `priceCart` that set
-  the charge.
+## patches/premium-launch.patch
+
+76 files across `wholesale-site`, `buyer-mobile-app`, and `owner-mobile-app`.
+Apply to a clean v15 tree:
+
+```bash
+patch -p1 < patches/premium-launch.patch
+mkdir -p wholesale-site/public/images
+cp <case.jpg> wholesale-site/public/images/case.jpg   # binary, ships beside the patch
+```
+
+See `CHANGES-v17.md` for the full write-up. Headlines:
+
+- **Order tracking** — one shared vocabulary (Baking / Packed / Shipped) across
+  app, website, and admin. Tracking is offered only once a parcel has actually
+  shipped, because a tracking number exists from the moment a label is bought
+  but UPS has nothing to show before the scan.
+- **Admin** — fixed the shipping queue rendering dark-on-dark inside the filter
+  toolbar; added a day summary and an expandable "what was ordered".
+- **Branded checkout** — the Payment Element and PaymentSheet are themed as
+  Dallas Bakery; the pay button reads "Pay Dallas Bakery $225.00".
+- **Premium storefront** — two-column shop with sticky summary, real product
+  photography (the catalog previously pointed at four image paths that did not
+  exist), per-case pricing copy throughout.
+- **Fixed a hydration mismatch** on `/order` introduced in v16.
 
 ### Verification
 
-49 unit tests pass (37 site, 9 buyer, 3 owner), TypeScript is clean in all
-three projects, the site lints clean, and `npm run build` succeeds - all
-re-run against a fresh unzip of v15 with the patch applied, not just the
-working tree.
+53 unit tests pass (41 site, 9 buyer, 3 owner), TypeScript clean in all three
+projects, the site lints and builds — re-run against a fresh unzip of v15 with
+the patch applied, not just the working tree.
 
-Not verified: no live Stripe call was made, because that needs
-`STRIPE_SECRET_KEY`. Place one real card order on each surface before launch.
+Not verified: no live Stripe call. Place one real card order on each surface
+before launch.

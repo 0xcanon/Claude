@@ -13,6 +13,7 @@ import { CartScreen } from "./src/screens/CartScreen";
 import { CatalogScreen } from "./src/screens/CatalogScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { LocationsScreen } from "./src/screens/LocationsScreen";
+import { OrderDetailScreen } from "./src/screens/OrderDetailScreen";
 import { OrderSuccessScreen } from "./src/screens/OrderSuccessScreen";
 import { OrdersScreen } from "./src/screens/OrdersScreen";
 import { PaymentScreen } from "./src/screens/PaymentScreen";
@@ -204,6 +205,18 @@ export default function App() {
           />
         </>
       );
+    case "order-detail-shipped":
+    case "order-detail-baking": {
+      const detail = screen === "order-detail-shipped"
+        ? fx.account.orders[0]!
+        : fx.account.orders[2]!;
+      return (
+        <>
+          <StatusBar style="dark" />
+          <OrderDetailScreen onBack={noop} onReorder={noop} order={detail} />
+        </>
+      );
+    }
     case "orders":
       return (
         <>
@@ -211,6 +224,7 @@ export default function App() {
           <OrdersScreen
             cartCount={cartCount}
             onCart={noop}
+            onOpenOrder={noop}
             onStartOrder={noop}
             onTab={noop}
             orders={fx.account.orders}
