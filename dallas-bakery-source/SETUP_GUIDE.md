@@ -135,8 +135,13 @@ Everything happens at `https://dallasbakery.net/admin`:
   price, it shows only inside a signed-in buyer account — the public pages
   and the app's welcome screen never display a dollar figure.
 - **Credit terms** — when you approve an account you'll be asked whether to
-  give it a credit limit (you can also change it any time on the approved
-  card). A buyer with credit checks out **on account by default** — they are
+  give it a credit limit and **Net 15 or Net 30** payment terms. Only the
+  customers you choose get terms at all, and you can set them on a *pending*
+  application too — they take effect the moment you approve it — or change
+  them any time on the card. Every account order stamps its invoice due date
+  from the customer's terms (order date + 15 or 30 days); the shipping queue
+  shows it, flags **OVERDUE** in red when the date passes unpaid, and the
+  buyer sees the due date on their confirmation and order history. A buyer with credit checks out **on account by default** — they are
   never asked for a card. "Place order on account" is the main button on the
   website and in the app; "Pay by card instead" sits underneath for whoever
   prefers it, and a card is only *required* when an order is over their

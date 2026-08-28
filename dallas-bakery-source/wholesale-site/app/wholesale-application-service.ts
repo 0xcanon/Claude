@@ -21,6 +21,8 @@ type UpdateInput = {
    * revokes ordering on account (existing invoices stay owed).
    */
   creditLimitCents?: number;
+  /** Net terms in days (15 or 30, 0 for none); omitted leaves it unchanged. */
+  creditTermsDays?: number;
 };
 
 /**
@@ -47,6 +49,7 @@ export async function updateWholesaleApplication(input: UpdateInput) {
       status: input.status,
       ownerNotes: input.ownerNotes,
       ...(input.creditLimitCents === undefined ? {} : { creditLimitCents: input.creditLimitCents }),
+      ...(input.creditTermsDays === undefined ? {} : { creditTermsDays: input.creditTermsDays }),
       decidedBy: input.status === "pending" ? "" : input.adminEmail,
       decidedAt: input.status === "pending" ? null : new Date().toISOString(),
       updatedAt: sql`CURRENT_TIMESTAMP`,

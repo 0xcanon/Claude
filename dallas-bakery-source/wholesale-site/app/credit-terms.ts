@@ -17,9 +17,15 @@ export type CreditState = {
   availableCents: number;
   /** Whether ordering on account is offered at all. */
   enabled: boolean;
+  /** Net payment terms in days (15 or 30); 0 when the account has none. */
+  termsDays: number;
 };
 
-export function computeCreditState(limitCents: number, outstandingCents: number): CreditState {
+export function computeCreditState(
+  limitCents: number,
+  outstandingCents: number,
+  termsDays = 0,
+): CreditState {
   const limit = Number.isFinite(limitCents) ? Math.max(0, Math.trunc(limitCents)) : 0;
   const outstanding = Number.isFinite(outstandingCents) ? Math.max(0, Math.trunc(outstandingCents)) : 0;
   return {
@@ -29,7 +35,33 @@ export function computeCreditState(limitCents: number, outstandingCents: number)
     // credit floors at zero rather than going negative.
     availableCents: Math.max(0, limit - outstanding),
     enabled: limit > 0,
+    termsDays: NET_TERMS_CHOICES.includes(termsDays as 15 | 30) ? termsDays : 0,
   };
+}
+
+/** The net terms the owner can grant. Not every customer gets terms at all. */
+export const NET_TERMS_CHOICES = [15, 30] as const;
+
+/** Validates net terms the way the admin API stores them. */
+export function validateNetTermsDays(value: number): string | null {
+  if (value === 0 || NET_TERMS_CHOICES.includes(value as 15 | 30)) return null;
+  return "Payment terms must be Net 15 or Net 30.";
+}
+
+/** "Net 15" / "Net 30", or empty when the account has no terms. */
+export function netTermsLabel(days: number): string {
+  return NET_TERMS_CHOICES.includes(days as 15 | 30) ? `Net ${days}` : "";
+}
+
+/**
+ * The invoice due date for an account order placed now: the order date plus
+ * the customer's net days. Stamped on the order so a later terms change
+ * never moves an existing invoice.
+ */
+export function invoiceDueDateIso(placedAt: Date, termsDays: number): string {
+  const days = NET_TERMS_CHOICES.includes(termsDays as 15 | 30) ? termsDays : 15;
+  const due = new Date(placedAt.getTime() + days * 24 * 60 * 60 * 1000);
+  return due.toISOString().slice(0, 10);
 }
 
 function dollars(cents: number) {

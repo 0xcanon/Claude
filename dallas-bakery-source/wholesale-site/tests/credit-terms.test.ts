@@ -4,8 +4,11 @@ import test from "node:test";
 import {
   assessAccountOrder,
   computeCreditState,
+  invoiceDueDateIso,
+  netTermsLabel,
   overLimitMessage,
   validateCreditLimitCents,
+  validateNetTermsDays,
 } from "../app/credit-terms.ts";
 
 test("credit state: available is limit minus outstanding", () => {
@@ -98,4 +101,30 @@ test("credit limit validation: bounds and integers", () => {
   assert.notEqual(validateCreditLimitCents(-1), null);
   assert.notEqual(validateCreditLimitCents(25_000_001), null);
   assert.notEqual(validateCreditLimitCents(12.5), null);
+});
+
+test("net terms: only 0, 15, and 30 are storable", () => {
+  assert.equal(validateNetTermsDays(0), null);
+  assert.equal(validateNetTermsDays(15), null);
+  assert.equal(validateNetTermsDays(30), null);
+  assert.notEqual(validateNetTermsDays(45), null);
+  assert.notEqual(validateNetTermsDays(-15), null);
+  assert.notEqual(validateNetTermsDays(7.5), null);
+});
+
+test("net terms: labels and state carry the chosen days", () => {
+  assert.equal(netTermsLabel(15), "Net 15");
+  assert.equal(netTermsLabel(30), "Net 30");
+  assert.equal(netTermsLabel(0), "");
+  assert.equal(computeCreditState(150_000, 0, 30).termsDays, 30);
+  // Junk days never leak into the state.
+  assert.equal(computeCreditState(150_000, 0, 45).termsDays, 0);
+});
+
+test("invoice due date: order date plus the net days", () => {
+  const placed = new Date("2026-08-28T15:00:00Z");
+  assert.equal(invoiceDueDateIso(placed, 15), "2026-09-12");
+  assert.equal(invoiceDueDateIso(placed, 30), "2026-09-27");
+  // Unknown terms fall back to the shorter Net 15, never to "no due date".
+  assert.equal(invoiceDueDateIso(placed, 0), "2026-09-12");
 });

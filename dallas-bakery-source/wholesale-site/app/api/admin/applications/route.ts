@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { getAdminAccount, getAuthorizedAdmin } from "../../../admin-auth";
-import { validateCreditLimitCents } from "../../../credit-terms.ts";
+import { validateCreditLimitCents, validateNetTermsDays } from "../../../credit-terms.ts";
 import { updateWholesaleApplication } from "../../../wholesale-application-service";
 import { getDb } from "../../../../db";
 import { orders, wholesaleApplications } from "../../../../db/schema";
@@ -68,7 +68,13 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Invalid request origin" }, { status: 403 });
   }
 
-  let payload: { id?: string; status?: string; ownerNotes?: string; creditLimitCents?: number };
+  let payload: {
+    id?: string;
+    status?: string;
+    ownerNotes?: string;
+    creditLimitCents?: number;
+    creditTermsDays?: number;
+  };
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
@@ -82,14 +88,29 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Invalid application update" }, { status: 400 });
   }
 
-  // Optional credit line. Absent means "leave as is" so a plain approval
-  // never touches an existing limit.
+  // Optional credit line and net terms. Absent means "leave as is" so a
+  // plain approval never touches what the owner already granted.
   let creditLimitCents: number | undefined;
   if (payload.creditLimitCents !== undefined) {
     const cents = Number(payload.creditLimitCents);
     const problem = validateCreditLimitCents(cents);
     if (problem) return Response.json({ error: problem }, { status: 400 });
     creditLimitCents = cents;
+  }
+  let creditTermsDays: number | undefined;
+  if (payload.creditTermsDays !== undefined) {
+    const days = Number(payload.creditTermsDays);
+    const problem = validateNetTermsDays(days);
+    if (problem) return Response.json({ error: problem }, { status: 400 });
+    creditTermsDays = days;
+  }
+  // A credit line always carries terms: granting a limit without choosing
+  // any defaults to Net 15, and revoking the limit clears the terms.
+  if (creditLimitCents !== undefined && creditLimitCents > 0 && !creditTermsDays) {
+    creditTermsDays = 15;
+  }
+  if (creditLimitCents === 0 && creditTermsDays === undefined) {
+    creditTermsDays = 0;
   }
 
   const application = await updateWholesaleApplication({
@@ -98,6 +119,7 @@ export async function PATCH(request: Request) {
     ownerNotes,
     adminEmail: admin.email,
     creditLimitCents,
+    creditTermsDays,
   });
 
   if (!application) {

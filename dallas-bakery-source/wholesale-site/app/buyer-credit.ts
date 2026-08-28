@@ -20,7 +20,10 @@ export async function creditStateFor(applicationId: string): Promise<CreditState
   if (!id) return computeCreditState(0, 0);
   const db = getDb();
   const [application] = await db
-    .select({ creditLimitCents: wholesaleApplications.creditLimitCents })
+    .select({
+      creditLimitCents: wholesaleApplications.creditLimitCents,
+      creditTermsDays: wholesaleApplications.creditTermsDays,
+    })
     .from(wholesaleApplications)
     .where(eq(wholesaleApplications.id, id))
     .limit(1);
@@ -38,5 +41,6 @@ export async function creditStateFor(applicationId: string): Promise<CreditState
   return computeCreditState(
     application?.creditLimitCents ?? 0,
     Number(balance?.outstandingCents || 0),
+    application?.creditTermsDays ?? 0,
   );
 }

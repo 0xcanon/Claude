@@ -40,6 +40,8 @@ export type NewOrderInput = {
   applicationId?: string;
   /** "card" (default) was charged at checkout; "account" is invoiced. */
   paymentTerms?: "card" | "account";
+  /** Account orders: when the invoice is due (from the buyer's net terms). */
+  invoiceDueAt?: string;
 };
 
 function todayStartIso() {
@@ -101,6 +103,7 @@ export async function recordOrder(input: NewOrderInput) {
     totalCents: input.totalCents,
     applicationId: input.applicationId || "",
     paymentTerms: input.paymentTerms || "card",
+    invoiceDueAt: input.paymentTerms === "account" ? input.invoiceDueAt || null : null,
     status: "paid",
   });
   return { created: true, id, orderNumber: nextNumber };

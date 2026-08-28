@@ -40,6 +40,9 @@ export const wholesaleApplications = sqliteTable(
     // Owner-granted credit line in cents. Zero means card-only. Orders placed
     // on account count against it until their invoice is marked paid.
     creditLimitCents: integer("credit_limit_cents").notNull().default(0),
+    // Net payment terms in days (15 or 30), chosen by the owner per business.
+    // Zero means no net terms. Only credit customers carry terms.
+    creditTermsDays: integer("credit_terms_days").notNull().default(0),
     decidedBy: text("decided_by").notNull().default(""),
     decidedAt: text("decided_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -128,6 +131,9 @@ export const orders = sqliteTable("orders", {
   // buyer's credit limit and stays outstanding until invoicePaidAt is set.
   paymentTerms: text("payment_terms").notNull().default("card"),
   invoicePaidAt: text("invoice_paid_at"),
+  // Account orders only: when the invoice is due, stamped at order time from
+  // the customer's net terms so a later terms change never moves it.
+  invoiceDueAt: text("invoice_due_at"),
   // "paid" -> "labeled" -> "shipped"
   status: text("status").notNull().default("paid"),
   trackingNumber: text("tracking_number").notNull().default(""),

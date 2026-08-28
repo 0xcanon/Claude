@@ -121,7 +121,7 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
               onPress={onOrderOnAccount}
             />
             <Text style={styles.accountFirstHint}>
-              {money(credit.availableCents)} of your {money(credit.limitCents)} credit available · invoiced, not charged
+              {money(credit.availableCents)} of your {money(credit.limitCents)} credit available · invoiced{credit.termsDays ? ` on Net ${credit.termsDays}` : ""}, not charged
             </Text>
             <Pressable
               accessibilityRole="button"

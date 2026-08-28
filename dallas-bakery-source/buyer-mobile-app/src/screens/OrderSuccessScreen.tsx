@@ -38,7 +38,7 @@ export function OrderSuccessScreen({ cutoffLabel, onDone, onViewOrders, order, s
         <Text style={styles.description}>
           {order
             ? onAccount
-              ? `Placed on your credit account — nothing was charged to a card; we'll invoice you. We emailed a confirmation.${cutoffLabel ? ` ${cutoffLabel}` : ""}`
+              ? `Placed on your credit account — nothing was charged to a card; we'll invoice you${order.termsLabel && order.invoiceDueAt ? ` on ${order.termsLabel} terms, due by ${order.invoiceDueAt}` : ""}. We emailed a confirmation.${cutoffLabel ? ` ${cutoffLabel}` : ""}`
               : `We emailed your receipt.${cutoffLabel ? ` ${cutoffLabel}` : ""}`
             : settling
               ? "Your card was charged and we have your order. The order number will appear in your history in a moment."

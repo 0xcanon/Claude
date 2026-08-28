@@ -3,18 +3,25 @@
 Everything in this round was verified live against a seeded local site:
 account orders placed and recorded, over-limit orders refused with the right
 amount, invoices marked paid, account orders cancelled, credit limits and
-exclusive prices set and cleared from /admin — plus 84 automated tests
-(72 site, 9 buyer app, 3 owner app), lint, typecheck, and a production build.
+exclusive prices set and cleared from /admin — plus 87 automated tests
+(75 site, 9 buyer app, 3 owner app), lint, typecheck, and a production build.
 
 ## Credit terms (order on account)
 
 - **Granting credit.** Approving an application now asks whether to give the
-  buyer a credit limit (dollars; 0 keeps them card-only). Every approved
-  card also carries a **Credit terms** editor showing
-  limit / outstanding / available, with a save box — so the limit can be
-  granted, raised, lowered, or revoked at any time.
-  Database: `credit_limit_cents` on `wholesale_applications`
-  (migration `0012`).
+  buyer a credit limit (dollars; 0 keeps them card-only) and **Net 15 or
+  Net 30** payment terms — only the customers the owner chooses get terms.
+  Every card (pending applications included, so terms can be set before
+  approval) carries a **Credit terms** editor showing
+  Net terms / limit / outstanding / available — all changeable at any time.
+  Each account order stamps its invoice due date at order time (order date
+  plus the net days), so a later terms change never moves an existing
+  invoice; the queue shows the due date and flags unpaid past-due invoices
+  **OVERDUE**, and the buyer sees the due date at confirmation, in email,
+  and in order history.
+  Database: `credit_limit_cents` + `credit_terms_days` on
+  `wholesale_applications`, `invoice_due_at` on `orders`
+  (migrations `0012`, `0013`).
 - **Ordering without a card.** Buyers with credit check out on account by
   default: **"Place order on account"** is the primary button on the website
   portal and in the app's payment screen (with how much credit is left), and
@@ -81,12 +88,12 @@ exclusive prices set and cleared from /admin — plus 84 automated tests
   shipping queue (`data-label` cells + the 720px CSS block), the https://
   guard on `EXPO_PUBLIC_API_URL` in signed builds, `expo-crypto` removed
   from the buyer app (lockfile regenerated), and the cart's Texas tax note.
-- Migration `0012_credit_terms_and_customer_prices.sql`; all 13 migrations
+- Migrations `0012_credit_terms_and_customer_prices.sql` and `0013_net_payment_terms.sql`; all 14 migrations
   verified to apply cleanly in order.
 
 ## Numbers
 
-- Tests: 72 site + 9 buyer app + 3 owner app, all green.
+- Tests: 75 site + 9 buyer app + 3 owner app, all green.
 - No client ever sends money amounts; credit checks and exclusive prices are
   entirely server-side, so a patched app can neither change a price nor
   exceed its credit line.

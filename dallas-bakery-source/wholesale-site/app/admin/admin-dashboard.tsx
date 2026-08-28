@@ -34,6 +34,7 @@ type WholesaleApplication = {
   status: ApplicationStatus;
   ownerNotes: string;
   creditLimitCents: number;
+  creditTermsDays: number;
   decidedBy: string;
   decidedAt: string | null;
   createdAt: string;
@@ -150,6 +151,7 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
     application: WholesaleApplication,
     status: ApplicationStatus,
     creditLimitCents?: number,
+    creditTermsDays?: number,
   ) {
     setSavingId(application.id);
     setErrors((current) => ({ ...current, [application.id]: "" }));
@@ -163,6 +165,7 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
           status,
           ownerNotes: notes[application.id] || "",
           ...(creditLimitCents === undefined ? {} : { creditLimitCents }),
+          ...(creditTermsDays === undefined ? {} : { creditTermsDays }),
         }),
       });
       const data = (await response.json()) as {
@@ -189,10 +192,12 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
     const action = status === "approved" ? "approve" : status === "declined" ? "decline" : "move to pending";
     if (!window.confirm(`Are you sure you want to ${action} ${application.businessName}?`)) return;
 
-    // Approval is the moment to decide on credit: a limit lets this buyer
-    // place orders on account (invoiced, no card). Cancel keeps whatever the
-    // account already has; it can be changed any time on the approved card.
+    // Approval is the moment to decide on credit: a limit plus Net 15/30
+    // terms lets this buyer order on account (invoiced, no card). Cancel
+    // keeps whatever the account already has; both can be changed any time
+    // in the Credit terms box on the card.
     let creditLimitCents: number | undefined;
+    let creditTermsDays: number | undefined;
     if (status === "approved") {
       const answer = window.prompt(
         `Give ${application.businessName} a credit limit?\n\n` +
@@ -206,8 +211,15 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
           creditLimitCents = Math.round(dollars * 100);
         }
       }
+      if (creditLimitCents !== undefined && creditLimitCents > 0) {
+        const termsAnswer = window.prompt(
+          `Payment terms for ${application.businessName}: type 30 for Net 30, or 15 for Net 15.`,
+          String(application.creditTermsDays === 30 ? 30 : 15),
+        );
+        creditTermsDays = Number(String(termsAnswer || "").trim()) === 30 ? 30 : 15;
+      }
     }
-    void updateApplication(application, status, creditLimitCents);
+    void updateApplication(application, status, creditLimitCents, creditTermsDays);
   }
 
   const [boxWeightLbs, setBoxWeightLbs] = useState((initialShipping.boxWeightOz / 16).toFixed(1));
@@ -425,11 +437,15 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
                 <span>Business signal: <strong>{application.categoryScreening.replaceAll("-", " ")}</strong></span>
               </div>
 
-              {application.status === "approved" && (
+              {application.status !== "declined" && (
+                /* Pending too: the owner can set credit and Net terms before
+                   approving, and they apply the moment the account goes live. */
                 <CreditTerms
                   creditLimitCents={application.creditLimitCents || 0}
+                  creditTermsDays={application.creditTermsDays || 0}
                   outstandingCents={initialOutstanding[application.id] || 0}
-                  onSave={(cents) => updateApplication(application, application.status, cents)}
+                  pending={application.status === "pending"}
+                  onSave={(cents, days) => updateApplication(application, application.status, cents, days)}
                 />
               )}
               {application.status === "approved" && (

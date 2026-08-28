@@ -33,6 +33,8 @@ export type CreditState = {
   limitCents: number;
   outstandingCents: number;
   availableCents: number;
+  /** 15 or 30 for Net terms; 0 when the account has none. */
+  termsDays: number;
 };
 
 export type CatalogPayload = {
@@ -157,6 +159,9 @@ export type ConfirmedOrder = {
   statusPageUrl: string;
   /** "account" was placed on credit — invoiced, no card charged. */
   paymentTerms?: "card" | "account";
+  /** "Net 15" / "Net 30" and the invoice due date, for account orders. */
+  termsLabel?: string;
+  invoiceDueAt?: string;
   deliverTo: { name: string; street: string; street2: string; city: string; state: string; zip: string };
 };
 

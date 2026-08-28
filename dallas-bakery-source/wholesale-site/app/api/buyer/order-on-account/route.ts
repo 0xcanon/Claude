@@ -22,7 +22,7 @@ import { orders } from "../../../../db/schema";
 import { BuyerAuthError, requireBuyer } from "../../../buyer-auth.ts";
 import { creditStateFor } from "../../../buyer-credit.ts";
 import { resolveDeliveryLocation } from "../../../buyer-locations.ts";
-import { assessAccountOrder, overLimitMessage } from "../../../credit-terms.ts";
+import { assessAccountOrder, invoiceDueDateIso, netTermsLabel, overLimitMessage } from "../../../credit-terms.ts";
 import { priceOverridesFor } from "../../../customer-pricing.ts";
 import {
   buyerOrderConfirmationEmail,
@@ -64,6 +64,8 @@ export async function POST(request: Request) {
 
     const deliverTo = await resolveDeliveryLocation(buyer, String(body.locationId || ""));
     const shipsToday = cutoffState().shipsToday;
+    // The invoice due date is fixed now, from this customer's net terms.
+    const invoiceDueAt = invoiceDueDateIso(new Date(), credit.termsDays);
 
     const items = cart.lines.map((line) => ({
       sku: line.sku,
@@ -94,6 +96,7 @@ export async function POST(request: Request) {
       totalCents: cart.totalCents,
       applicationId: buyer.applicationId,
       paymentTerms: "account",
+      invoiceDueAt,
     });
 
     // The hard guarantee: re-check the balance now that this order is in.
@@ -124,6 +127,8 @@ export async function POST(request: Request) {
       totalCents: cart.totalCents,
       shipsToday,
       paymentTerms: "account" as const,
+      termsLabel: netTermsLabel(credit.termsDays),
+      invoiceDueAt,
     };
     await sendMail(ownerNewOrderEmail(emailDetails));
     await sendMail(buyerOrderConfirmationEmail(emailDetails));
@@ -152,6 +157,8 @@ export async function POST(request: Request) {
         trackingNumber: order.trackingNumber,
         statusPageUrl: trackingUrl(order.trackingNumber),
         paymentTerms: "account",
+        termsLabel: netTermsLabel(credit.termsDays),
+        invoiceDueAt,
         deliverTo: {
           name: order.customerName,
           street: order.street,

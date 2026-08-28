@@ -24,6 +24,8 @@ type Credit = {
   limitCents: number;
   outstandingCents: number;
   availableCents: number;
+  /** 15 or 30 for Net terms; 0 when the account has none. */
+  termsDays: number;
 };
 
 type Location = {
@@ -63,6 +65,7 @@ type Order = {
   total: { amount: string };
   paymentTerms?: "card" | "account";
   invoicePaid?: boolean;
+  invoiceDueAt?: string;
 };
 
 const SESSION_KEY = "db-wholesale-session";
@@ -535,7 +538,7 @@ export function OrderPortal() {
 
       {credit?.enabled && (
         <p className="buyer-credit-banner">
-          <strong>Credit account.</strong>{" "}
+          <strong>Credit account{credit.termsDays ? ` · Net ${credit.termsDays}` : ""}.</strong>{" "}
           {money(credit.availableCents)} available of your {money(credit.limitCents)} limit
           {credit.outstandingCents > 0
             ? <> — {money(credit.outstandingCents)} on open invoices.</>
@@ -707,7 +710,9 @@ export function OrderPortal() {
                     <span className={`buyer-order-pill stage-${order.stage}`}>{order.stageLabel}</span>
                     {order.paymentTerms === "account" && (
                       <span className={`buyer-order-terms ${order.invoicePaid ? "settled" : ""}`}>
-                        {order.invoicePaid ? "Invoice paid" : "On account"}
+                        {order.invoicePaid
+                          ? "Invoice paid"
+                          : `On account${order.invoiceDueAt ? ` · due ${order.invoiceDueAt}` : ""}`}
                       </span>
                     )}
                   </div>

@@ -276,7 +276,18 @@ type OrderEmailInput = {
   shipsToday: boolean;
   /** "account" was placed on credit and will be invoiced; default is card. */
   paymentTerms?: "card" | "account";
+  /** "Net 15" / "Net 30" for account orders with terms; empty otherwise. */
+  termsLabel?: string;
+  /** Account orders: the invoice due date (YYYY-MM-DD). */
+  invoiceDueAt?: string;
 };
+
+function dueWording(order: Pick<OrderEmailInput, "termsLabel" | "invoiceDueAt">) {
+  if (!order.invoiceDueAt) return "";
+  return order.termsLabel
+    ? ` (${order.termsLabel} — due ${order.invoiceDueAt})`
+    : ` (due ${order.invoiceDueAt})`;
+}
 
 function dollars(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
@@ -303,7 +314,7 @@ export function ownerNewOrderEmail(order: OrderEmailInput): MailMessage {
     }, ${dollars(order.totalCents)}${onAccount ? " ON ACCOUNT" : ""}${order.shipsToday ? " — ships today" : ""}`,
     text: [
       onAccount
-        ? `New wholesale order ON ACCOUNT — no card was charged; it counts against the buyer's credit until you mark the invoice paid in /admin.`
+        ? `New wholesale order ON ACCOUNT${dueWording(order)} — no card was charged; it counts against the buyer's credit until you mark the invoice paid in /admin.`
         : `New paid ${wholesale ? "wholesale" : "retail"} order.`,
       ``,
       `Order #${order.orderNumber} — ${order.customerName || order.email}`,
@@ -343,7 +354,10 @@ export function buyerOrderConfirmationEmail(order: OrderEmailInput): MailMessage
       `Subtotal: ${dollars(order.subtotalCents)}`,
       `Shipping (${order.boxCount} box${order.boxCount === 1 ? "" : "es"}): ${dollars(order.shippingCents)}`,
       onAccount
-        ? `Total on account: ${dollars(order.totalCents)} — nothing was charged to a card. We'll invoice you on your usual terms.`
+        ? `Total on account: ${dollars(order.totalCents)} — nothing was charged to a card. ` +
+          (order.termsLabel && order.invoiceDueAt
+            ? `We'll invoice you on ${order.termsLabel} terms; payment is due by ${order.invoiceDueAt}.`
+            : `We'll invoice you on your usual terms.`)
         : `Total charged: ${dollars(order.totalCents)}`,
       ``,
       order.shipsToday

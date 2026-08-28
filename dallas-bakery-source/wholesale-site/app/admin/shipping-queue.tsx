@@ -26,6 +26,7 @@ type ShippingOrder = {
   status: string;
   paymentTerms: "card" | "account";
   invoicePaidAt: string | null;
+  invoiceDueAt: string | null;
   trackingNumber: string;
   trackingUrl: string;
   labelError: string;
@@ -39,6 +40,17 @@ type UpsState = { connected: boolean; environment: string };
 
 function money(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+/** "ON ACCOUNT · due Sep 12", "ON ACCOUNT · OVERDUE", or "Invoice paid". */
+function invoiceTag(order: { invoicePaidAt: string | null; invoiceDueAt: string | null }) {
+  if (order.invoicePaidAt) return { text: "Invoice paid", overdue: false };
+  if (!order.invoiceDueAt) return { text: "ON ACCOUNT", overdue: false };
+  const due = new Date(`${order.invoiceDueAt}T23:59:59`);
+  if (!Number.isNaN(due.getTime()) && due.getTime() < Date.now()) {
+    return { text: `ON ACCOUNT · OVERDUE (was due ${order.invoiceDueAt})`, overdue: true };
+  }
+  return { text: `ON ACCOUNT · due ${order.invoiceDueAt}`, overdue: false };
 }
 
 /** The same words the buyer sees, so the owner and the buyer agree. */
@@ -399,11 +411,14 @@ export function ShippingQueue() {
                 <td data-label="Boxes">{order.boxCount}{order.loafCount ? <small>{order.loafCount} loaves</small> : null}</td>
                 <td data-label="Total">
                   {money(order.totalCents)}
-                  {order.paymentTerms === "account" && (
-                    <small className={`admin-terms ${order.invoicePaidAt ? "settled" : "open"}`}>
-                      {order.invoicePaidAt ? "Invoice paid" : "ON ACCOUNT"}
-                    </small>
-                  )}
+                  {order.paymentTerms === "account" && (() => {
+                    const tag = invoiceTag(order);
+                    return (
+                      <small className={`admin-terms ${order.invoicePaidAt ? "settled" : tag.overdue ? "overdue" : "open"}`}>
+                        {tag.text}
+                      </small>
+                    );
+                  })()}
                 </td>
                 <td data-label="Status">
                   <span className={`admin-status status-${order.status}`}>{statusLabel(order.status)}</span>
@@ -445,7 +460,7 @@ export function ShippingQueue() {
                         <p className="admin-order-money">
                           <span>Subtotal</span><span>{money(order.subtotalCents)}</span>
                           <span>Shipping · {order.boxCount} box{order.boxCount === 1 ? "" : "es"}</span><span>{money(order.shippingCents)}</span>
-                          <strong>{order.paymentTerms === "account" ? (order.invoicePaidAt ? "Invoiced · paid" : "To invoice") : "Charged"}</strong><strong>{money(order.totalCents)}</strong>
+                          <strong>{order.paymentTerms === "account" ? (order.invoicePaidAt ? "Invoiced · paid" : order.invoiceDueAt ? `To invoice · due ${order.invoiceDueAt}` : "To invoice") : "Charged"}</strong><strong>{money(order.totalCents)}</strong>
                         </p>
                         {order.paymentTerms === "account" && !order.invoicePaidAt && order.status !== "refunded" && (
                           <button

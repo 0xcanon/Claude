@@ -26,6 +26,9 @@ export type ConfirmedOrder = {
   statusPageUrl: string;
   /** "account" was placed on credit — invoiced, no card charged. */
   paymentTerms?: "card" | "account";
+  /** "Net 15" / "Net 30" and the invoice due date, for account orders. */
+  termsLabel?: string;
+  invoiceDueAt?: string;
   deliverTo: { name: string; street: string; street2: string; city: string; state: string; zip: string };
 };
 
@@ -90,7 +93,11 @@ export function OrderConfirmation({
       <p>
         {order
           ? onAccount
-            ? `Placed on your credit account — nothing was charged to a card; we'll invoice you. We emailed a confirmation. ${cutoffLabel}`
+            ? `Placed on your credit account — nothing was charged to a card; we'll invoice you${
+                order.termsLabel && order.invoiceDueAt
+                  ? ` on ${order.termsLabel} terms, due by ${order.invoiceDueAt}`
+                  : ""
+              }. We emailed a confirmation. ${cutoffLabel}`
             : `We emailed a receipt. ${cutoffLabel}`
           : settled
             ? "Your card was charged and the order is being recorded. It will appear in your order history shortly, and we have already been notified."

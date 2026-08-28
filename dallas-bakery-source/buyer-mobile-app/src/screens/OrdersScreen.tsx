@@ -65,7 +65,7 @@ export function OrdersScreen({
                     <Text style={[styles.pill, stagePill(order.stage)]}>{order.stageLabel.toUpperCase()}</Text>
                     {order.paymentTerms === "account" && (
                       <Text style={order.invoicePaid ? styles.termsSettled : styles.termsOpen}>
-                        {order.invoicePaid ? "INVOICE PAID" : "ON ACCOUNT"}
+                        {order.invoicePaid ? "INVOICE PAID" : `ON ACCOUNT${order.invoiceDueAt ? ` · DUE ${order.invoiceDueAt}` : ""}`}
                       </Text>
                     )}
                   </View>

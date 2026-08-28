@@ -91,6 +91,7 @@ export async function GET(request: Request) {
           // the money is owed until the invoice is marked paid here.
           paymentTerms: order.paymentTerms === "account" ? "account" : "card",
           invoicePaidAt: order.invoicePaidAt,
+          invoiceDueAt: order.invoiceDueAt,
           trackingNumber: order.trackingNumber,
           trackingUrl: trackingUrl(order.trackingNumber),
           labelError: order.labelError,

@@ -108,6 +108,8 @@ export type BuyerOrder = {
   /** "account" was placed on credit and is invoiced; "card" was charged. */
   paymentTerms?: "card" | "account";
   invoicePaid?: boolean;
+  /** Account orders: when the invoice is due (YYYY-MM-DD). */
+  invoiceDueAt?: string;
 
   deliverTo: {
     name: string;

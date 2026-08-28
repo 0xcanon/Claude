@@ -68,6 +68,7 @@ export async function GET(request: Request) {
           // buyer's screens badge them so a card charge is never implied.
           paymentTerms: order.paymentTerms === "account" ? "account" : "card",
           invoicePaid: Boolean(order.invoicePaidAt),
+          invoiceDueAt: order.invoiceDueAt || "",
 
           deliverTo: {
             name: order.customerName,
