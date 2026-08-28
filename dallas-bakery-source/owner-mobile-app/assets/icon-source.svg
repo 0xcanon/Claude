@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#2B1A13"/>
+  <circle cx="512" cy="490" r="290" fill="#F5EDDF"/>
+  <g fill="none" stroke="#C84A2A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 700V310"/>
+    <path d="M512 390c-75-10-120-55-126-126 75 10 120 55 126 126Z"/>
+    <path d="M512 482c-82-10-132-58-138-135 82 10 132 58 138 135Z"/>
+    <path d="M512 574c-82-10-132-58-138-135 82 10 132 58 138 135Z"/>
+    <path d="M512 390c75-10 120-55 126-126-75 10-120 55-126 126Z"/>
+    <path d="M512 482c82-10 132-58 138-135-82 10-132 58-138 135Z"/>
+    <path d="M512 574c82-10 132-58 138-135-82 10-132 58-138 135Z"/>
+  </g>
+  <text x="512" y="742" text-anchor="middle" fill="#2B1A13" font-family="Georgia, serif" font-size="72" font-weight="700" letter-spacing="8">DB</text>
+</svg>

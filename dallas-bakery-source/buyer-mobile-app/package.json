@@ -1,0 +1,33 @@
+{
+  "name": "dallas-bakery-buyer-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "build:android": "eas build --platform android --profile production",
+    "build:ios": "eas build --platform ios --profile production"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.14",
+    "@stripe/stripe-react-native": "0.64.0",
+    "expo": "~57.0.10",
+    "expo-secure-store": "~57.0.1",
+    "expo-splash-screen": "~57.0.5",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}

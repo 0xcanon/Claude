@@ -1,0 +1,1 @@
+ALTER TABLE `admin_accounts` ADD `credential_epoch` text DEFAULT '1' NOT NULL;

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <g fill="none" stroke="#C84A2A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 650V318"/>
+    <path d="M512 400c-68-9-109-49-115-115 68 9 109 49 115 115Z"/>
+    <path d="M512 488c-74-9-118-52-124-123 74 9 118 52 124 123Z"/>
+    <path d="M512 576c-74-9-118-52-124-123 74 9 118 52 124 123Z"/>
+    <path d="M512 400c68-9 109-49 115-115-68 9-109 49-115 115Z"/>
+    <path d="M512 488c74-9 118-52 124-123-74 9-118 52-124 123Z"/>
+    <path d="M512 576c74-9 118-52 124-123-74 9-118 52-124 123Z"/>
+  </g>
+  <text x="512" y="744" text-anchor="middle" fill="#F5EDDF" font-family="Georgia, serif" font-size="76" font-weight="700" letter-spacing="5">DALLAS BAKERY</text>
+  <text x="512" y="808" text-anchor="middle" fill="#E8B14C" font-family="Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="12">OWNER PORTAL</text>
+</svg>

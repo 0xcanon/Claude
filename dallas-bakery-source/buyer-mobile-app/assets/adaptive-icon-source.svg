@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <g fill="none" stroke="#F5EDDF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 730V278"/>
+    <path d="M512 372c-80-10-128-59-135-135 80 10 128 59 135 135Z"/>
+    <path d="M512 478c-88-11-140-62-147-145 88 11 140 62 147 145Z"/>
+    <path d="M512 584c-88-11-140-62-147-145 88 11 140 62 147 145Z"/>
+    <path d="M512 372c80-10 128-59 135-135-80 10-128 59-135 135Z"/>
+    <path d="M512 478c88-11 140-62 147-145-88 11-140 62-147 145Z"/>
+    <path d="M512 584c88-11 140-62 147-145-88 11-140 62-147 145Z"/>
+  </g>
+  <text x="512" y="825" text-anchor="middle" fill="#E8B14C" font-family="Georgia, serif" font-size="92" font-weight="700" letter-spacing="10">DB</text>
+</svg>

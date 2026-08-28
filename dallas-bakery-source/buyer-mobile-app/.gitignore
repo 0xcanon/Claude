@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+.env
+.env.local
+dist/
+web-build/
+*.jks
+*.keystore
+*.mobileprovision

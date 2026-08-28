@@ -1,0 +1,50 @@
+// Wrangler configuration for deploying the wholesale site to Dallas Bakery's
+// OWN Cloudflare account, independent of the original hosting control plane.
+//
+// The file is deliberately named wrangler.deploy.jsonc (not wrangler.jsonc)
+// so the @cloudflare/vite-plugin dev flow keeps using .openai/hosting.json
+// unchanged; only the npm "deploy" and "db:migrate" scripts read this file.
+//
+// One-time setup — see DEPLOYMENT.md for the full sequence:
+//   1. npx wrangler d1 create dallas-bakery-wholesale
+//   2. Paste the returned database_id below.
+//   3. npm run db:migrate
+//   4. npm run build, confirm the emitted worker/assets paths below, then
+//      npm run deploy.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dallas-bakery-wholesale",
+
+  // Verify these two paths against the output of `npm run build` before the
+  // first deploy (`ls dist`). Adjust here if the vinext build emits them
+  // under different names — nothing else in this file depends on them.
+  "main": "dist/worker/index.js",
+  "assets": { "directory": "dist/client", "binding": "ASSETS" },
+
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Standing weekly orders: one run each morning, 13:00 UTC (7am CDT / 8am
+  // CST) — after midnight Central so the weekday is unambiguous, before the
+  // noon cutoff so a charged order still bakes and ships the same day.
+  "triggers": { "crons": ["0 13 * * *"] },
+
+  // Cloudflare Images binding used by /_vinext/image. The homepage now marks
+  // its images `unoptimized`, so nothing requires this binding today; it is
+  // declared so optimization can be turned back on without a config change.
+  "images": { "binding": "IMAGES" },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dallas-bakery-wholesale",
+      // REPLACE with the id printed by: npx wrangler d1 create dallas-bakery-wholesale
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "drizzle"
+    }
+  ]
+
+  // Secrets are NOT set here. Set each one with:
+  //   npx wrangler secret put <NAME> --config wrangler.deploy.jsonc
+  // using the names listed in .env.example.
+}
