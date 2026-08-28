@@ -4,7 +4,7 @@ import type {
   ShippingSettings,
   TrackedApplication,
 } from "./types";
-import type { ConfirmedOrder, PaymentStart } from "./lib/storefront";
+import type { ConfirmedOrder, CutoffState, PaymentStart, StandingOrderInfo } from "./lib/storefront";
 
 export const shipping: ShippingSettings = {
   rateCents: 1250,
@@ -299,4 +299,23 @@ export const confirmedOrder: ConfirmedOrder = {
     state: "TX",
     zip: "75206",
   },
+};
+
+export const cutoff: CutoffState = {
+  shipsToday: true,
+  label: "Order in the next 2 hours and it bakes and ships today",
+};
+
+export const standingOrder: StandingOrderInfo = {
+  weekday: 2,
+  weekdayName: "Tuesday",
+  active: true,
+  locationId: "app_7Yh2",
+  lastRunDate: "2026-08-25",
+  lastRunStatus: "charged",
+  lines: [
+    { sku: "WS-BARBARI-25", cases: 2 },
+    { sku: "WS-NATURAL-25", cases: 1 },
+  ],
+  summary: { caseCount: 3, totalCents: 22_500, shippingCents: 3_750 },
 };

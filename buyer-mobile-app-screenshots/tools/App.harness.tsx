@@ -118,6 +118,7 @@ export default function App() {
           <CatalogScreen
             cart={cart}
             cartCount={cartCount}
+            cutoff={fx.cutoff}
             error=""
             loading={false}
             locations={fx.account.locations}
@@ -154,6 +155,7 @@ export default function App() {
             cart={cart}
             checkoutError=""
             checkingOut={false}
+            cutoff={fx.cutoff}
             locations={fx.account.locations}
             onBack={noop}
             onCheckout={noop}
@@ -162,6 +164,13 @@ export default function App() {
             products={fx.products}
             selectedLocationId={locationId}
             shipping={fx.shipping}
+            standingBusy={false}
+            standingNotice=""
+            standingOrder={null}
+            standingWeekday={2}
+            onPauseStanding={noop}
+            onSaveStanding={noop}
+            onSelectStandingWeekday={noop}
           />
         </>
       );
@@ -255,8 +264,11 @@ export default function App() {
             account={fx.account}
             cartCount={cartCount}
             onCart={noop}
+            onPauseStanding={noop}
             onSignOut={noop}
             onTab={noop}
+            standingBusy={false}
+            standingOrder={fx.standingOrder}
             userInitials={initials}
           />
         </>

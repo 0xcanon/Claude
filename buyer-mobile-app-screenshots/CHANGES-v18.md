@@ -75,6 +75,26 @@ is built; charged off-session to the saved card by a daily cron (13:00 UTC,
 - Weekday logic is evaluated in Central time and unit-tested across the UTC
   midnight boundary.
 
+## App–website parity
+
+The app and the website now offer the same wholesale experience, feature for
+feature:
+
+- **Standing orders in the app** — the cart gains the same standing-order card
+  as the website (weekday chips, "Make it weekly", pause), and the account
+  screen shows the active order ("Every Tuesday · 3 cases · $225.00") with a
+  pause action. Same API, same server-side pricing.
+- **Cutoff banner in the app** — the catalog and cart now show the one line
+  every wholesale buyer plans around ("Order in the next 2 hours and it bakes
+  and ships today"), rendered identically in both places so the answer never
+  changes between adding cases and paying. The order confirmation reflects it
+  too, instead of a hardcoded blank.
+- **Reorder on the website** — every past order gets "Order these cases
+  again", refilling the cart with whatever is still in the catalog, matching
+  the app's order-detail reorder.
+- **Refunded orders on the website** — the pill, the plain statement instead
+  of a progress tracker, and no tracking link, matching the app.
+
 ## Deliberately not in this release
 
 Push notifications. They need APNs/FCM credentials and a store build to test
@@ -82,7 +102,8 @@ against — batch them with the first app update instead of holding launch.
 
 ## Verification
 
-62 unit tests pass (50 site, 9 buyer app, 3 owner app); TypeScript and lint
+62 unit tests pass (50 site, 9 buyer app, 3 owner app), app–website parity
+was re-verified screen by screen; TypeScript and lint
 clean in all three projects; the site builds with the new
 `/api/buyer/standing-order` and `/api/admin/buyer-locations` routes. Website
 and admin screenshots were captured from the real site on a seeded database —
