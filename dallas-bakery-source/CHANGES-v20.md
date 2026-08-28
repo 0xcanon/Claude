@@ -15,10 +15,12 @@ exclusive prices set and cleared from /admin — plus 81 automated tests
   granted, raised, lowered, or revoked at any time.
   Database: `credit_limit_cents` on `wholesale_applications`
   (migration `0012`).
-- **Ordering without a card.** Buyers with credit see
-  **"Order on account — no card"** next to the card button on the website
-  portal and in the app's payment screen, along with how much credit is
-  left. The endpoint (`POST /api/buyer/order-on-account`) prices the same
+- **Ordering without a card.** Buyers with credit check out on account by
+  default: **"Place order on account"** is the primary button on the website
+  portal and in the app's payment screen (with how much credit is left), and
+  they are never asked for a card — **"Pay by card instead"** sits underneath
+  as the optional path, becoming required only when an order is over the
+  available credit. The endpoint (`POST /api/buyer/order-on-account`) prices the same
   cart server-side (exclusive prices included), checks it against available
   credit, and records the order immediately with `payment_terms='account'`
   — no Stripe object exists for it. The response carries the recorded

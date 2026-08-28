@@ -609,22 +609,30 @@ export function OrderPortal() {
             One case ships as one box at {money(shipping.rateCents)}. No sales tax on bakery items.
             {rules ? ` ${rules.minimumLabel} minimum. Delivery in ${rules.leadTimeLabel}.` : ""}
           </small>
-          <button type="button" disabled={busy || accountBusy || !caseCount} onClick={checkout}>
-            {busy ? "Preparing…" : "Continue to payment"}
-          </button>
-          {credit?.enabled && (
+          {credit?.enabled && caseCount > 0 && subtotalCents + shippingCents <= credit.availableCents ? (
+            /* A buyer with credit defaults to their account — no card asked
+               for. Card stays one click away for whoever prefers it. */
             <>
+              <button type="button" disabled={busy || accountBusy} onClick={() => void orderOnAccount()}>
+                {accountBusy ? "Placing order…" : "Place order on account — no card"}
+              </button>
               <button
                 type="button"
                 className="buyer-account-button"
-                disabled={busy || accountBusy || !caseCount || subtotalCents + shippingCents > credit.availableCents}
-                onClick={() => void orderOnAccount()}
+                disabled={busy || accountBusy}
+                onClick={checkout}
               >
-                {accountBusy ? "Placing order…" : "Order on account — no card"}
+                {busy ? "Preparing…" : "Pay by card instead"}
               </button>
-              {caseCount > 0 && subtotalCents + shippingCents > credit.availableCents && (
+            </>
+          ) : (
+            <>
+              <button type="button" disabled={busy || accountBusy || !caseCount} onClick={checkout}>
+                {busy ? "Preparing…" : "Continue to payment"}
+              </button>
+              {credit?.enabled && caseCount > 0 && subtotalCents + shippingCents > credit.availableCents && (
                 <small className="buyer-credit-short">
-                  This order is over your available credit ({money(credit.availableCents)} left) — pay by card, or settle an open invoice first.
+                  This order is over your available credit ({money(credit.availableCents)} left), so it needs a card — or settle an open invoice first.
                 </small>
               )}
             </>

@@ -136,10 +136,13 @@ Everything happens at `https://dallasbakery.net/admin`:
   and the app's welcome screen never display a dollar figure.
 - **Credit terms** — when you approve an account you'll be asked whether to
   give it a credit limit (you can also change it any time on the approved
-  card). A buyer with credit sees an extra **"Order on account — no card"**
-  button on the website and in the app: the order comes straight to your
-  shipping queue tagged **ON ACCOUNT**, nothing is charged to a card, and you
-  invoice them however you normally do. When they pay you, open the order in
+  card). A buyer with credit checks out **on account by default** — they are
+  never asked for a card. "Place order on account" is the main button on the
+  website and in the app; "Pay by card instead" sits underneath for whoever
+  prefers it, and a card is only *required* when an order is over their
+  available credit. The order comes straight to your shipping queue tagged
+  **ON ACCOUNT**, nothing is charged to a card, and you invoice them however
+  you normally do. When they pay you, open the order in
   the queue and press **Mark invoice paid** — that frees up their credit for
   the next order. Unpaid account orders always count against the limit, and an
   order that would go over it is politely refused at checkout. Cancelling an

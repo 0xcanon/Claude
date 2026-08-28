@@ -46,6 +46,10 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
 
   const summary: OrderSummary = payment.summary;
   const deliverTo = payment.deliverTo;
+  // A buyer with credit defaults to their account — the card sheet only
+  // opens if they choose it, or if the order is over their available credit.
+  const accountFirst = Boolean(credit?.enabled && onOrderOnAccount)
+    && summary.totalCents <= (credit?.availableCents ?? 0);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,7 +62,9 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
         <Text style={styles.kicker}>DALLAS BAKERY · SECURE CHECKOUT</Text>
         <Text style={styles.title}>Complete your{`\n`}order.</Text>
         <Text style={styles.description}>
-          You are paying Dallas Bakery directly. Your card is encrypted on this device — we never see or store the number.
+          {accountFirst
+            ? "This order goes on your credit account — no card needed; we'll invoice you. Prefer to pay now? The card option is below."
+            : "You are paying Dallas Bakery directly. Your card is encrypted on this device — we never see or store the number."}
         </Text>
 
         <View style={styles.summary}>
@@ -107,33 +113,42 @@ export function PaymentScreen({ error, onBack, onPay, paying, payment, credit, o
 
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
 
-        <PrimaryButton
-          label={`PAY ${money(summary.totalCents)}`}
-          loading={paying}
-          onPress={onPay}
-        />
-        {credit?.enabled && onOrderOnAccount && (
-          summary.totalCents <= credit.availableCents ? (
+        {accountFirst && credit && onOrderOnAccount ? (
+          <>
+            <PrimaryButton
+              label="PLACE ORDER ON ACCOUNT"
+              loading={placingOnAccount}
+              onPress={onOrderOnAccount}
+            />
+            <Text style={styles.accountFirstHint}>
+              {money(credit.availableCents)} of your {money(credit.limitCents)} credit available · invoiced, not charged
+            </Text>
             <Pressable
               accessibilityRole="button"
               disabled={paying || placingOnAccount}
-              onPress={onOrderOnAccount}
-              style={({ pressed }) => [styles.accountButton, (pressed || placingOnAccount) && styles.accountButtonPressed]}
+              onPress={onPay}
+              style={({ pressed }) => [styles.accountButton, (pressed || paying) && styles.accountButtonPressed]}
             >
-              {placingOnAccount ? (
+              {paying ? (
                 <ActivityIndicator color={colors.chocolate} size="small" />
               ) : (
-                <Text style={styles.accountButtonText}>ORDER ON ACCOUNT — NO CARD</Text>
+                <Text style={styles.accountButtonText}>PAY {money(summary.totalCents)} BY CARD INSTEAD</Text>
               )}
-              <Text style={styles.accountButtonHint}>
-                {money(credit.availableCents)} of your {money(credit.limitCents)} credit available · invoiced, not charged
-              </Text>
             </Pressable>
-          ) : (
-            <Text style={styles.accountShort}>
-              This order is over your available credit ({money(credit.availableCents)} left) — pay by card, or settle an open invoice first.
-            </Text>
-          )
+          </>
+        ) : (
+          <>
+            <PrimaryButton
+              label={`PAY ${money(summary.totalCents)}`}
+              loading={paying}
+              onPress={onPay}
+            />
+            {credit?.enabled && onOrderOnAccount && summary.totalCents > credit.availableCents && (
+              <Text style={styles.accountShort}>
+                This order is over your available credit ({money(credit.availableCents)} left), so it needs a card — or settle an open invoice first.
+              </Text>
+            )}
+          </>
         )}
         <Text style={styles.note}>
           🔒  Encrypted end to end. You can close the card sheet at any time without being charged.
@@ -177,7 +192,7 @@ const styles = StyleSheet.create({
   accountButton: { marginTop: 10, minHeight: 52, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: colors.chocolate, backgroundColor: "transparent" },
   accountButtonPressed: { opacity: 0.6 },
   accountButtonText: { color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 1 },
-  accountButtonHint: { marginTop: 4, color: colors.muted, fontFamily: fonts.sans, fontSize: 8.5, textAlign: "center" },
+  accountFirstHint: { marginTop: 8, color: colors.muted, fontFamily: fonts.sans, fontSize: 8.5, textAlign: "center" },
   accountShort: { marginTop: 10, padding: 12, color: colors.rust, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, fontFamily: fonts.sans, fontSize: 9.5, lineHeight: 14 },
   note: { marginTop: 12, color: colors.muted, fontFamily: fonts.sans, fontSize: 8.5, lineHeight: 13, textAlign: "center" },
 });
