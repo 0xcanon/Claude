@@ -49,9 +49,11 @@ exclusive prices set and cleared from /admin — plus 81 automated tests
   table (one row per business + product), managed through
   `POST /api/admin/customer-prices`.
 - **Where it applies.** Overrides are resolved server-side everywhere a cart
-  is priced: the buyer's catalog (their card shows the special price with a
-  **YOUR PRICE** tag), the payment intent, webhook intake re-pricing,
-  standing weekly orders, and order-on-account. The pure pricing core
+  is priced: the buyer's catalog (their price is simply shown as the price —
+  the list price never reaches a buyer's browser or phone, and nothing in
+  the catalog signals that other businesses pay differently), the payment
+  intent, webhook intake re-pricing, standing weekly orders, and
+  order-on-account. The pure pricing core
   (`priceCartFromProducts`) takes an optional overrides map, so one code
   path prices every buyer correctly; new tests pin the behaviour (override
   applies to its SKU only, invalid values fall back to list, shipping is

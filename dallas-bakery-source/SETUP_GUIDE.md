@@ -144,10 +144,12 @@ Everything happens at `https://dallasbakery.net/admin`:
   un-shipped account order releases its amount instantly (no Stripe involved,
   since no card was charged).
 - **Exclusive pricing** — on any approved buyer's card, open **Exclusive
-  pricing** to give that business its own price per loaf on any bread. Only
-  they see it (their catalog shows a "YOUR PRICE" tag); everyone else keeps
-  the list price. The special price follows them everywhere — website, app,
-  standing weekly orders, and receipts. "Back to list price" removes it.
+  pricing** to give that business its own price per loaf on any bread. Each
+  buyer's catalog simply shows their prices as *the* prices — nothing hints
+  that anyone pays differently, and the list price never reaches their
+  browser or phone. Only your admin shows the comparison. The special price
+  follows them everywhere — website, app, standing weekly orders, and
+  receipts. "Back to list price" removes it.
 
 ## Part 4 — The phone apps (do after the website works)
 

@@ -77,8 +77,10 @@ export async function priceCart(
 
 /**
  * Catalog shaped for the app's and the website's existing product types.
- * With overrides, a buyer's exclusive price replaces the list price and the
- * variant is flagged so clients can show "your price".
+ * With overrides, a buyer's exclusive price replaces the list price — it is
+ * simply THE price. Nothing in the payload signals that other businesses pay
+ * differently: most buyers have their own pricing, and each one's catalog
+ * should read as the ordinary catalog.
  */
 export async function catalogForClients(currencyCode = "USD", overrides?: PriceOverrides) {
   const rows = await listActiveProducts();
@@ -104,7 +106,6 @@ export async function catalogForClients(currencyCode = "USD", overrides?: PriceO
         },
         quantityRule: { minimum: MINIMUM_CASES, maximum: null, increment: 1 },
         unitsPerCase: product.loavesPerCase,
-        exclusivePrice: loafPriceCents !== product.loafPriceCents,
       },
     };
   });

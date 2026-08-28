@@ -877,10 +877,6 @@ footer { color: var(--cream); background: var(--ink); }
   margin: 0.8rem 0 0; font-size: 0.84rem; padding: 0.8rem 1rem;
   border-left: 3px solid var(--sage); background: rgba(105, 114, 88, 0.1); color: #3d5740;
 }
-.buyer-your-price {
-  font-size: 0.58rem; letter-spacing: 0.12em; font-weight: 700; color: #3d5740;
-  background: rgba(105, 114, 88, 0.16); padding: 0.22rem 0.5rem; border-radius: 999px;
-}
 
 .buyer-shop-body {
   display: grid; grid-template-columns: minmax(0, 1fr) 21rem;

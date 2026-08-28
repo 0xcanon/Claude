@@ -16,8 +16,6 @@ type Product = {
     title: string;
     price: { amount: string; currencyCode: string };
     unitsPerCase?: number;
-    /** True when this buyer has an exclusive price on the product. */
-    exclusivePrice?: boolean;
   };
 };
 
@@ -567,7 +565,6 @@ export function OrderPortal() {
                   <p className="buyer-case-price">
                     <strong>{money(priceCents)}</strong>
                     <span>per case</span>
-                    {product.variant.exclusivePrice && <span className="buyer-your-price">YOUR PRICE</span>}
                     <small>{perCase} loaves · {money(Math.round(priceCents / perCase))} a loaf</small>
                   </p>
                   <div className="buyer-case-actions">
