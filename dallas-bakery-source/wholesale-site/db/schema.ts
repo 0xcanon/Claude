@@ -43,6 +43,12 @@ export const wholesaleApplications = sqliteTable(
     // Net payment terms in days (15 or 30), chosen by the owner per business.
     // Zero means no net terms. Only credit customers carry terms.
     creditTermsDays: integer("credit_terms_days").notNull().default(0),
+    // Set when the buyer closes the account from the app. The row survives
+    // because order records point at it, but its personal details are
+    // scrubbed and every buyer lookup excludes it — so a live session stops
+    // working the moment this is stamped.
+    closedAt: text("closed_at"),
+    closedReason: text("closed_reason").notNull().default(""),
     decidedBy: text("decided_by").notNull().default(""),
     decidedAt: text("decided_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -55,6 +61,7 @@ export const wholesaleApplications = sqliteTable(
     ),
     index("wholesale_applications_email_idx").on(table.email),
     index("wholesale_applications_tracking_token_idx").on(table.trackingTokenHash),
+    index("wholesale_applications_closed_idx").on(table.closedAt),
   ],
 );
 
@@ -299,6 +306,11 @@ export const pushDevices = sqliteTable(
     applicationId: text("application_id").notNull().default(""),
     email: text("email").notNull().default(""),
     platform: text("platform").notNull().default(""),
+    // What this device wants to hear about. Stored server-side because that
+    // is where the decision to send is made; a switch that only lived on the
+    // phone could not stop a push already on its way.
+    orderUpdates: integer("order_updates", { mode: "boolean" }).notNull().default(true),
+    invoiceReminders: integer("invoice_reminders", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     lastSeenAt: text("last_seen_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },

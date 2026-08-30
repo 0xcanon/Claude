@@ -241,3 +241,32 @@ The apps talk to the website, so the website must be live first.
 - Card form doesn't load → `STRIPE_PUBLISHABLE_KEY` missing.
 
 Each fix is: correct the secret, run `npm run deploy` again.
+
+## Part 5 — Getting the apps approved by Apple and Google
+
+Before you submit anything, read `APP_STORE_SUBMISSION.md`. The short version:
+
+1. **Set the two review secrets** so App Review can sign in. Without this the
+   buyer app is rejected — a reviewer cannot read the email your sign-in code
+   goes to, so they never get past the front door.
+   ```bash
+   cd wholesale-site
+   npx wrangler secret put REVIEW_DEMO_EMAIL   # appreview@dallasbakery.com
+   npx wrangler secret put REVIEW_DEMO_CODE    # six digits you pick
+   ```
+   Put that same email and code into App Store Connect under
+   **App Review Information → Sign-in required**, and paste the reviewer notes
+   from `APP_STORE_SUBMISSION.md`.
+
+2. **The owner app should not go on the public App Store.** It is a staff
+   tool for one company, and Apple rejects those. Use a Custom App through
+   Apple Business Manager, or TestFlight, or just use `/admin` in your phone's
+   browser — it does the same things. `APP_STORE_SUBMISSION.md` explains all
+   three.
+
+3. Buyers can now **delete their account in the app** (Account → Delete
+   account). It really deletes their details, addresses, saved card, standing
+   order and notifications — but keeps past orders, because sales records have
+   to stay for tax. They see exactly that before they confirm, and an unpaid
+   balance is shown in red first. You get an email whenever an account closes,
+   flagged if they left owing money.

@@ -59,7 +59,92 @@ export default {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.dallasbakery.wholesale",
-      config: { usesNonExemptEncryption: false }
+      // HTTPS only, using the platform's own TLS — no custom cryptography,
+      // so the app is exempt from the export-compliance questionnaire.
+      config: { usesNonExemptEncryption: false },
+      // Apple's privacy manifest. Every "required reason" API the app or its
+      // dependencies touch has to be declared with a reason code, and the
+      // app has to state what it collects. Missing or wrong, App Store
+      // Connect warns at upload and then refuses the build.
+      privacyManifests: {
+        NSPrivacyTracking: false,
+        NSPrivacyTrackingDomains: [],
+        NSPrivacyCollectedDataTypes: [
+          {
+            // The business's contact details, from the application form.
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeEmailAddress",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeName",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypePhoneNumber",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            // Delivery addresses. Coarse rather than precise: we ship to a
+            // storefront, we never read the device's location.
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypePhysicalAddress",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            // Order history. Payment card data never reaches this app —
+            // Stripe's SDK collects it directly.
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypePurchaseHistory",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            // The Expo push token, only if the buyer turns notifications on.
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeDeviceID",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          }
+        ],
+        NSPrivacyAccessedAPITypes: [
+          {
+            // expo-secure-store and the JS runtime read file timestamps.
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryFileTimestamp",
+            NSPrivacyAccessedAPITypeReasons: ["C617.1"]
+          },
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults",
+            NSPrivacyAccessedAPITypeReasons: ["CA92.1"]
+          },
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategorySystemBootTime",
+            NSPrivacyAccessedAPITypeReasons: ["35F9.1"]
+          },
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryDiskSpace",
+            NSPrivacyAccessedAPITypeReasons: ["E174.1"]
+          }
+        ]
+      }
     },
     android: {
       package: "com.dallasbakery.wholesale",

@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   lightBorder: { borderColor: colors.line },
   lightText: { color: colors.chocolate },
   badge: { position: "absolute", top: -5, right: -5, minWidth: 18, height: 18, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderRadius: 9, backgroundColor: colors.rust },
-  badgeText: { color: colors.paper, fontFamily: fonts.sansMedium, fontSize: 7 },
+  badgeText: { color: colors.paper, fontFamily: fonts.sansMedium, fontSize: 9.4 },
   profile: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 20, backgroundColor: colors.paper },
   profileLight: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
   profileText: { color: colors.rust, fontFamily: fonts.serif, fontSize: 15 },

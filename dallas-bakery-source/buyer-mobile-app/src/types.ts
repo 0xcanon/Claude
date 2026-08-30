@@ -218,3 +218,23 @@ export type BuyerInvoice = {
 export type CartQuantityMap = Record<string, number>;
 
 export type MainTab = "home" | "catalog" | "orders" | "locations" | "account";
+
+/** What closing an account would erase and what the bakery has to keep. */
+export type ClosurePreview = {
+  businessName: string;
+  email: string;
+  orderCount: number;
+  locationCount: number;
+  hasStandingOrder: boolean;
+  hasSavedCard: boolean;
+  pushDeviceCount: number;
+  onMarketingList: boolean;
+  outstandingCents: number;
+  overdueCents: number;
+};
+
+/** Which alerts a buyer wants on this device. */
+export type NotificationPreferences = {
+  orderUpdates: boolean;
+  invoiceReminders: boolean;
+};

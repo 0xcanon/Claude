@@ -60,7 +60,7 @@ export function stripeForm(input: Record<string, unknown>, prefix = ""): URLSear
 async function call<T>(
   path: string,
   init: {
-    method: "GET" | "POST";
+    method: "GET" | "POST" | "DELETE";
     body?: Record<string, unknown>;
     idempotencyKey?: string;
     /** Extra headers — the ephemeral-key endpoint requires Stripe-Version. */
@@ -140,6 +140,21 @@ export type StripeCustomer = { id: string; email?: string };
 
 export function createCustomer(body: Record<string, unknown>) {
   return call<StripeCustomer>("/customers", { method: "POST", body });
+}
+
+/**
+ * Deletes a Stripe customer, which takes their saved cards with it.
+ *
+ * Used when a buyer closes their account: a saved card is personal data we
+ * put in Stripe on their behalf, so closing the account has to remove it
+ * there too, not only here. Past charges and refunds survive — Stripe keeps
+ * those as the payment record, and so must we.
+ */
+export function deleteCustomer(customerId: string) {
+  return call<{ id: string; deleted?: boolean }>(
+    `/customers/${encodeURIComponent(customerId)}`,
+    { method: "DELETE" },
+  );
 }
 
 /**

@@ -105,8 +105,8 @@ export function OrderPaperwork({
 
 const styles = StyleSheet.create({
   card: { marginTop: 16, padding: 15, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
-  kicker: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 7, letterSpacing: 1 },
-  label: { marginTop: 13, color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 7, letterSpacing: 0.9 },
+  kicker: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 9.4, letterSpacing: 1 },
+  label: { marginTop: 13, color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 9.4, letterSpacing: 0.9 },
   labelSpaced: { marginTop: 18 },
   input: {
     marginTop: 7,
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: 11,
   },
-  hint: { marginTop: 6, color: colors.muted, fontFamily: fonts.sans, fontSize: 8.5, lineHeight: 13 },
+  hint: { marginTop: 6, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, lineHeight: 13 },
   picker: {
     marginTop: 7,
     minHeight: 40,

@@ -107,7 +107,7 @@ function StatusStep({ complete, current = false, declined = false, detail, label
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 18, paddingTop: 36, paddingBottom: 42 },
-  kicker: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 8, letterSpacing: 1.5 },
+  kicker: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 9.8, letterSpacing: 1.5 },
   title: { marginTop: 12, color: colors.chocolate, fontFamily: fonts.serif, fontSize: 39, lineHeight: 42 },
   description: { marginTop: 12, color: colors.muted, fontFamily: fonts.sans, fontSize: 11, lineHeight: 18 },
   timeline: { marginTop: 24, marginBottom: 14, padding: 17, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   statusCopy: { flex: 1, paddingTop: 4, paddingLeft: 8 },
   statusLabel: { color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 11 },
   statusDetail: { marginTop: 5, color: colors.muted, fontFamily: fonts.sans, fontSize: 9, lineHeight: 14 },
-  pill: { marginTop: 1, paddingVertical: 5, paddingHorizontal: 7, borderRadius: 10, overflow: "hidden", color: colors.chocolate, backgroundColor: colors.goldPale, fontFamily: fonts.sansMedium, fontSize: 6, letterSpacing: 0.5 },
+  pill: { marginTop: 1, paddingVertical: 5, paddingHorizontal: 7, borderRadius: 10, overflow: "hidden", color: colors.chocolate, backgroundColor: colors.goldPale, fontFamily: fonts.sansMedium, fontSize: 9, letterSpacing: 0.5 },
   error: { marginBottom: 12, padding: 12, color: colors.danger, backgroundColor: colors.rosePale, fontFamily: fonts.sans, fontSize: 10, lineHeight: 16 },
   secondary: { marginTop: 9 },
   help: { marginTop: 26, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, textAlign: "center", textDecorationLine: "underline" },

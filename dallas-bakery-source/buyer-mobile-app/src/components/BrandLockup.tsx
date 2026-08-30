@@ -23,5 +23,5 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.serif, fontSize: 20, lineHeight: 23, letterSpacing: 0.5, fontWeight: "700" },
   nameCompact: { fontSize: 16, lineHeight: 19 },
   subname: { marginTop: 2, color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 10, lineHeight: 13, letterSpacing: 3 },
-  subnameCompact: { fontSize: 8, lineHeight: 11, letterSpacing: 2.3 },
+  subnameCompact: { fontSize: 9.8, lineHeight: 11, letterSpacing: 2.3 },
 });

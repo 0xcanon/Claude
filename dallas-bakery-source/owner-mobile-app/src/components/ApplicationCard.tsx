@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  signalText: { color: colors.sage, fontFamily: fonts.sansMedium, fontSize: 8, letterSpacing: 0.8 },
+  signalText: { color: colors.sage, fontFamily: fonts.sansMedium, fontSize: 9.8, letterSpacing: 0.8 },
   locationBadge: {
     minHeight: 25,
     justifyContent: "center",
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  locationText: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 8, letterSpacing: 0.8 },
+  locationText: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 9.8, letterSpacing: 0.8 },
   headingRow: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
   monogram: { width: 46, height: 46, alignItems: "center", justifyContent: "center", backgroundColor: colors.rust },
   monogramText: { color: colors.paper, fontFamily: fonts.serif, fontSize: 21 },
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   footer: { flexDirection: "row", padding: 14 },
   footerCopy: { width: "43%" },
   received: { width: "57%", alignItems: "flex-end" },
-  footerLabel: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 8, letterSpacing: 1.1 },
+  footerLabel: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 9.8, letterSpacing: 1.1 },
   contact: { marginTop: 5, color: colors.ink, fontFamily: fonts.sansMedium, fontSize: 11 },
   date: { marginTop: 5, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, textAlign: "right" },
 });

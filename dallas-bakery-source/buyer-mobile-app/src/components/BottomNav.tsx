@@ -44,8 +44,8 @@ const styles = StyleSheet.create({
   nav: { minHeight: 68, paddingTop: 8, paddingBottom: 7, flexDirection: "row", borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.paper },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3 },
   icon: { color: "#988A81", fontFamily: fonts.sansMedium, fontSize: 17 },
-  label: { color: "#988A81", fontFamily: fonts.sansMedium, fontSize: 6.5, letterSpacing: 0.6 },
+  label: { color: "#988A81", fontFamily: fonts.sansMedium, fontSize: 9.2, letterSpacing: 0.6 },
   active: { color: colors.rust },
   badge: { position: "absolute", top: -5, right: -10, minWidth: 17, height: 17, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderRadius: 9, backgroundColor: colors.rust },
-  badgeText: { color: colors.paper, fontFamily: fonts.sansMedium, fontSize: 7 },
+  badgeText: { color: colors.paper, fontFamily: fonts.sansMedium, fontSize: 9.4 },
 });

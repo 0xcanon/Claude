@@ -64,7 +64,9 @@ export async function runInvoiceReminders(today = new Date()): Promise<ReminderO
     const message = kind === "overdue"
       ? invoiceOverduePush({ orderNumber: row.orderNumber })
       : invoiceDuePush({ orderNumber: row.orderNumber, daysUntilDue });
-    const devices = await pushToBuyer(row.applicationId, message);
+    // Invoice chasing is its own category — a buyer may want shipping alerts
+    // without it, and this is where that choice is honoured.
+    const devices = await pushToBuyer(row.applicationId, message, "invoice");
     outcomes.push({ orderNumber: row.orderNumber, applicationId: row.applicationId, kind, devices });
   }
   return outcomes;

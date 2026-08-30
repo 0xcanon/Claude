@@ -39,5 +39,5 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     letterSpacing: 3,
   },
-  subnameCompact: { fontSize: 8, lineHeight: 11, letterSpacing: 2.3 },
+  subnameCompact: { fontSize: 9.8, lineHeight: 11, letterSpacing: 2.3 },
 });

@@ -25,6 +25,18 @@ const CHUNK_SIZE = 100;
 
 export type PushAudience = "buyer" | "owner";
 
+/**
+ * Which kind of alert a message is, so a buyer who wants shipping notices but
+ * not invoice chasing gets exactly that. "order" covers placed and shipped;
+ * "invoice" covers due and past-due.
+ */
+export type PushCategory = "order" | "invoice";
+
+export type NotificationPreferences = {
+  orderUpdates: boolean;
+  invoiceReminders: boolean;
+};
+
 function accessToken() {
   return String(process.env.EXPO_ACCESS_TOKEN || "").trim();
 }
@@ -40,6 +52,8 @@ export async function registerDevice(input: {
   applicationId?: string;
   email?: string;
   platform?: string;
+  /** Absent on first registration means "everything", which is the default. */
+  preferences?: Partial<NotificationPreferences>;
 }) {
   const token = String(input.token || "").trim();
   if (!isExpoPushToken(token)) return false;
@@ -49,6 +63,8 @@ export async function registerDevice(input: {
     applicationId: String(input.applicationId || ""),
     email: String(input.email || "").trim().toLowerCase(),
     platform: String(input.platform || "").slice(0, 20),
+    orderUpdates: input.preferences?.orderUpdates !== false,
+    invoiceReminders: input.preferences?.invoiceReminders !== false,
   };
   await getDb()
     .insert(pushDevices)
@@ -67,14 +83,56 @@ export async function unregisterDevice(token: string) {
   await getDb().delete(pushDevices).where(eq(pushDevices.token, value));
 }
 
-async function tokensForBusiness(applicationId: string) {
+/**
+ * The devices for one business that still want to hear about `category`.
+ * A device that switched a category off simply is not in the list, so the
+ * preference is enforced where the send happens rather than trusted to the
+ * phone that asked for it.
+ */
+async function tokensForBusiness(applicationId: string, category: PushCategory) {
   const id = String(applicationId || "").trim();
   if (!id) return [];
+  const wanted = category === "invoice" ? pushDevices.invoiceReminders : pushDevices.orderUpdates;
   const rows = await getDb()
     .select({ token: pushDevices.token })
     .from(pushDevices)
-    .where(and(eq(pushDevices.audience, "buyer"), eq(pushDevices.applicationId, id)));
+    .where(and(
+      eq(pushDevices.audience, "buyer"),
+      eq(pushDevices.applicationId, id),
+      eq(wanted, true),
+    ));
   return rows.map((row) => row.token);
+}
+
+/** This device's current choices, for the app's notification settings. */
+export async function preferencesForDevice(token: string): Promise<NotificationPreferences | null> {
+  const value = String(token || "").trim();
+  if (!value) return null;
+  const [row] = await getDb()
+    .select({ orderUpdates: pushDevices.orderUpdates, invoiceReminders: pushDevices.invoiceReminders })
+    .from(pushDevices)
+    .where(eq(pushDevices.token, value))
+    .limit(1);
+  return row || null;
+}
+
+/** Updates one device's choices. Returns false when the token is unknown. */
+export async function setPreferencesForDevice(
+  token: string,
+  preferences: NotificationPreferences,
+) {
+  const value = String(token || "").trim();
+  if (!value) return false;
+  const updated = await getDb()
+    .update(pushDevices)
+    .set({
+      orderUpdates: preferences.orderUpdates !== false,
+      invoiceReminders: preferences.invoiceReminders !== false,
+      lastSeenAt: sql`CURRENT_TIMESTAMP`,
+    })
+    .where(eq(pushDevices.token, value))
+    .returning({ token: pushDevices.token });
+  return updated.length > 0;
 }
 
 async function ownerTokens() {
@@ -168,10 +226,17 @@ export async function sendPush(tokens: string[], message: PushMessage) {
   return valid.length - dead.length;
 }
 
-/** Everyone signed in to the buyer app for this business. */
-export async function pushToBuyer(applicationId: string, message: PushMessage) {
+/**
+ * Everyone signed in to the buyer app for this business who still wants this
+ * kind of alert.
+ */
+export async function pushToBuyer(
+  applicationId: string,
+  message: PushMessage,
+  category: PushCategory = "order",
+) {
   try {
-    return await sendPush(await tokensForBusiness(applicationId), message);
+    return await sendPush(await tokensForBusiness(applicationId, category), message);
   } catch (caught) {
     console.error("Buyer push failed:", caught);
     return 0;

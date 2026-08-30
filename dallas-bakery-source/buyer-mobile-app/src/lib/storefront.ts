@@ -12,7 +12,9 @@ import type {
   BuyerSession,
   CartQuantityMap,
   CatalogProduct,
+  ClosurePreview,
   DeliveryWindow,
+  NotificationPreferences,
   ShippingSettings,
 } from "../types";
 
@@ -360,4 +362,81 @@ export async function pauseStandingOrder(session: BuyerSession) {
     },
   );
   return result.standingOrder;
+}
+
+
+/* ------------------------------------------------------ account closure -- */
+
+/**
+ * What closing the account would erase and what the bakery has to keep.
+ * Loaded before anything is destroyed so the screen can say it plainly.
+ */
+export async function getClosurePreview(session: BuyerSession) {
+  const result = await authorized<{ preview: ClosurePreview; confirmPhrase: string }>(
+    "/api/buyer/close-account",
+    session,
+  );
+  return result.preview;
+}
+
+/**
+ * Closes the account. Irreversible, and the session dies with it — the server
+ * excludes closed accounts from every buyer lookup, so the token this call
+ * was made with stops working the moment it returns.
+ */
+export async function closeAccount(session: BuyerSession, confirm: string, reason: string) {
+  return authorized<{
+    closed: true;
+    businessName: string;
+    ordersRetained: number;
+    outstandingCents: number;
+  }>("/api/buyer/close-account", session, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm, reason }),
+  });
+}
+
+/* ------------------------------------------------ notification settings -- */
+
+/**
+ * This device's notification choices. Keyed by the push token rather than the
+ * session: a person turning their own alerts off should never be stopped by
+ * an expired sign-in.
+ */
+export async function getNotificationPreferences(deviceToken: string) {
+  if (!deviceToken) return null;
+  try {
+    const response = await fetch(
+      apiUrl(`/api/push/register?token=${encodeURIComponent(deviceToken)}`),
+      { headers: { Accept: "application/json" } },
+    );
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      registered: boolean;
+      preferences: NotificationPreferences;
+    };
+    return data.preferences || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setNotificationPreferences(
+  deviceToken: string,
+  preferences: NotificationPreferences,
+) {
+  const response = await fetch(apiUrl("/api/push/register"), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: deviceToken, ...preferences }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new CatalogError(
+      typeof data?.error === "string" ? data.error : "That could not be saved.",
+      response.status,
+    );
+  }
+  return (data as { preferences: NotificationPreferences }).preferences;
 }

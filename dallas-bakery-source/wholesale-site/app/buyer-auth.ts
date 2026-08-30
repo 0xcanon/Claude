@@ -11,10 +11,11 @@
  * Secret: BUYER_SESSION_SECRET (npx wrangler secret put BUYER_SESSION_SECRET)
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb } from "../db";
 import { buyerLoginCodes, wholesaleApplications } from "../db/schema";
+import { ensureReviewDemoAccount, isReviewDemoLogin, reviewDemoEmail } from "./review-access.ts";
 
 export const CODE_TTL_MINUTES = 15;
 export const MAX_CODE_ATTEMPTS = 5;
@@ -117,6 +118,11 @@ export async function findApprovedBuyer(email: string): Promise<ApprovedBuyer | 
     .where(and(
       eq(wholesaleApplications.email, normalizeEmail(email)),
       eq(wholesaleApplications.status, "approved"),
+      // A closed account is not an account. This one clause is what makes a
+      // still-valid session token stop working the instant a buyer closes
+      // their account — sessions are signed rather than stored, so there is
+      // no session row to delete, and every request re-checks this.
+      isNull(wholesaleApplications.closedAt),
     ))
     .limit(1);
   return row ? (row as ApprovedBuyer) : null;
@@ -129,6 +135,9 @@ export async function findApprovedBuyer(email: string): Promise<ApprovedBuyer | 
  */
 export async function issueLoginCode(email: string) {
   const address = normalizeEmail(email);
+  // App Review's account is built on demand — including after a reviewer has
+  // tested account deletion on it, which closes it like any other.
+  if (address && address === reviewDemoEmail()) await ensureReviewDemoAccount();
   const buyer = await findApprovedBuyer(address);
   if (!buyer) return null;
 
@@ -248,6 +257,17 @@ export async function readDocumentToken(token: string): Promise<DocumentClaims |
 export async function verifyLoginCode(email: string, code: string) {
   const address = normalizeEmail(email);
   const submitted = String(code || "").replace(/\D/g, "");
+
+  // The App Review sign-in. Both secrets must be set and both must match; a
+  // reviewer cannot read the email a real buyer's code is sent to, and a
+  // sign-in wall they cannot pass is a guideline 2.1 rejection.
+  if (isReviewDemoLogin(address, submitted)) {
+    await ensureReviewDemoAccount();
+    const buyer = await findApprovedBuyer(address);
+    if (!buyer) throw new BuyerAuthError("The review account could not be prepared.", 503);
+    return { buyer, session: await createSessionToken(address) };
+  }
+
   const db = getDb();
   const [row] = await db
     .select()

@@ -24,7 +24,7 @@ const styles = StyleSheet.create({
   badge: { minHeight: 25, justifyContent: "center", paddingHorizontal: 9 },
   label: {
     fontFamily: fonts.sansMedium,
-    fontSize: 8,
+    fontSize: 9.8,
     lineHeight: 10,
     letterSpacing: 1.1,
   },

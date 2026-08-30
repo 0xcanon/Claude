@@ -400,3 +400,93 @@ export function standingOrderProblemEmail(email: string, reason: string): MailMe
     ].join("\n"),
   };
 }
+
+/**
+ * The receipt for closing an account — the last mail this address will get
+ * from us, and the only record the buyer keeps of what was erased and what
+ * the bakery still holds. Sent before the address is scrubbed.
+ */
+export function buyerAccountClosedEmail(input: {
+  email: string;
+  businessName: string;
+  contactName: string;
+  ordersRetained: number;
+  outstandingCents: number;
+}): MailMessage {
+  const owes = input.outstandingCents > 0;
+  return {
+    to: input.email,
+    subject: "Your Dallas Bakery wholesale account is closed",
+    text: [
+      `Hi ${firstName(input.contactName)},`,
+      ``,
+      `The wholesale account for ${input.businessName} is closed. This is the last email`,
+      `we'll send to this address.`,
+      ``,
+      `What we deleted:`,
+      `  - Your business and contact details`,
+      `  - Your saved delivery addresses`,
+      `  - Your saved card (removed at our payment processor too)`,
+      `  - Your standing weekly order, if you had one`,
+      `  - Any pricing set specifically for you`,
+      `  - Your devices registered for notifications`,
+      `  - Your entry on our email list`,
+      ``,
+      `What we have to keep:`,
+      input.ordersRetained > 0
+        ? `  - ${input.ordersRetained} past order${input.ordersRetained === 1 ? "" : "s"}, with the name and address each one shipped to.`
+        : `  - Nothing. You had no orders on file.`,
+      input.ordersRetained > 0
+        ? `    Sales records are required for tax and accounting, and we can't delete them.`
+        : ``,
+      ``,
+      owes
+        ? [
+            `Your balance:`,
+            `  ${dollars(input.outstandingCents)} is still owed on unpaid invoices. Closing the account`,
+            `  does not cancel it. Call ${SUPPORT_PHONE} and we'll settle it with you.`,
+            ``,
+          ].join("\n")
+        : `You owed nothing when the account closed.`,
+      ``,
+      `If this wasn't you, call us right away at ${SUPPORT_PHONE}.`,
+      ``,
+      `Thanks for baking with us.`,
+      ``,
+      `- Dallas Bakery Wholesale`,
+      `${SUPPORT_PHONE} · ${SUPPORT_EMAIL}`,
+    ].filter((line) => line !== "").join("\n"),
+  };
+}
+
+/** Tells the owner an account left, and whether it left owing money. */
+export function ownerAccountClosedEmail(input: {
+  businessName: string;
+  email: string;
+  reason: string;
+  ordersRetained: number;
+  outstandingCents: number;
+}): MailMessage {
+  return {
+    to: ownerNotificationAddress(),
+    subject: input.outstandingCents > 0
+      ? `Account closed with ${dollars(input.outstandingCents)} outstanding — ${input.businessName}`
+      : `Wholesale account closed — ${input.businessName}`,
+    text: [
+      `${input.businessName} (${input.email}) closed their wholesale account from the app.`,
+      ``,
+      input.reason ? `Reason given: ${input.reason}` : `No reason given.`,
+      ``,
+      `Their contact details, saved addresses, saved card, standing order, and any`,
+      `exclusive pricing are gone. ${input.ordersRetained} past order${input.ordersRetained === 1 ? "" : "s"} remain in the`,
+      `shipping queue and your books, which is what the records require.`,
+      ``,
+      input.outstandingCents > 0
+        ? `THEY STILL OWE ${dollars(input.outstandingCents)} on unpaid invoices. Closing the account does not`
+        + `\ncancel that — chase it the way you would any other receivable.`
+        : `They owed nothing.`,
+      ``,
+      `- Dallas Bakery Wholesale`,
+    ].join("\n"),
+  };
+}

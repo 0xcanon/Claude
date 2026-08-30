@@ -23,11 +23,16 @@ import {
 } from "./src/lib/secure-session";
 import { paymentSheet } from "./src/lib/payments";
 import { configureForegroundBehaviour, devicePlatform, getPushToken } from "./src/lib/push";
+import packageJson from "./package.json";
 import {
   CatalogError,
+  closeAccount,
   getCatalogPayload,
+  getClosurePreview,
   getDocumentLink,
   getInvoices,
+  getNotificationPreferences,
+  setNotificationPreferences,
   getOrderStatus,
   getStandingOrder,
   orderOnAccount,
@@ -42,19 +47,25 @@ import {
   type PaymentStart,
   type StandingOrderInfo,
 } from "./src/lib/storefront";
+import { AboutScreen } from "./src/screens/AboutScreen";
+import { AccountClosedScreen } from "./src/screens/AccountClosedScreen";
 import { AccountScreen } from "./src/screens/AccountScreen";
 import { ApplicationScreen } from "./src/screens/ApplicationScreen";
 import { ApplicationStatusScreen } from "./src/screens/ApplicationStatusScreen";
 import { CartScreen } from "./src/screens/CartScreen";
 import { CatalogScreen } from "./src/screens/CatalogScreen";
+import { CloseAccountScreen } from "./src/screens/CloseAccountScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
+import { LegalScreen } from "./src/screens/LegalScreen";
 import { LocationsScreen } from "./src/screens/LocationsScreen";
+import { NotificationSettingsScreen } from "./src/screens/NotificationSettingsScreen";
 import { OrderDetailScreen } from "./src/screens/OrderDetailScreen";
 import { OrderSuccessScreen } from "./src/screens/OrderSuccessScreen";
 import { OrdersScreen } from "./src/screens/OrdersScreen";
 import { PaymentScreen } from "./src/screens/PaymentScreen";
 import { ProductDetailScreen } from "./src/screens/ProductDetailScreen";
 import { SignInScreen } from "./src/screens/SignInScreen";
+import { SupportScreen } from "./src/screens/SupportScreen";
 import { WelcomeScreen } from "./src/screens/WelcomeScreen";
 import { colors, fonts } from "./src/theme";
 import type {
@@ -64,7 +75,9 @@ import type {
   BuyerSession,
   CatalogProduct,
   CartQuantityMap,
+  ClosurePreview,
   DeliveryWindow,
+  NotificationPreferences,
   MainTab,
   ShippingSettings,
   TrackedApplication,
@@ -72,7 +85,11 @@ import type {
 
 type Screen =
   | "welcome" | "apply" | "status" | "signin"
-  | MainTab | "product" | "cart" | "pay" | "paid" | "order";
+  | MainTab | "product" | "cart" | "pay" | "paid" | "order"
+  // Pages a customer — or an App Review reviewer — can open with or without
+  // an account: help, the legal documents, notification settings, and the
+  // account-closure flow Apple requires to live inside the app.
+  | "support" | "legal" | "about" | "notifications" | "close-account" | "closed";
 
 // How long the confirmation screen waits for Stripe's webhook to record the
 // order before it stops polling. The payment is captured either way.
@@ -137,6 +154,21 @@ export default function App() {
   const [documentError, setDocumentError] = useState("");
   const [pushToken, setPushToken] = useState("");
   const [checkoutError, setCheckoutError] = useState("");
+
+  // The pages a customer can open with or without an account, and the state
+  // behind the two that do something: notification choices, and closing.
+  const [legalDocument, setLegalDocument] = useState<"privacy" | "terms">("privacy");
+  const [returnScreen, setReturnScreen] = useState<Screen>("welcome");
+  const [notificationPreferences, setNotificationPrefs] = useState<NotificationPreferences | null>(null);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState("");
+  const [closureSummary, setClosureSummary] = useState<{
+    businessName: string;
+    ordersRetained: number;
+    outstandingCents: number;
+  } | null>(null);
 
   const selectedLocation = useMemo(
     () => account?.locations.find((location) => location.id === selectedLocationId) || account?.locations[0] || null,
@@ -601,6 +633,125 @@ export default function App() {
   }
 
   /**
+   * Opens one of the always-available pages and remembers where to come back
+   * to. A reviewer reading the privacy notice from the welcome screen lands
+   * back on the welcome screen; a buyer reading it from Account lands back on
+   * Account.
+   */
+  function openPage(next: Screen, legal?: "privacy" | "terms") {
+    if (legal) setLegalDocument(legal);
+    setReturnScreen(screen);
+    setScreen(next);
+  }
+
+  /** Loads this device's stored notification choices for the settings page. */
+  const loadNotificationPreferences = useCallback(async () => {
+    if (!pushToken) {
+      setNotificationPrefs(null);
+      return;
+    }
+    const stored = await getNotificationPreferences(pushToken);
+    setNotificationPrefs(stored || { orderUpdates: true, invoiceReminders: true });
+  }, [pushToken]);
+
+  async function changeNotificationPreferences(next: NotificationPreferences) {
+    if (!pushToken) return;
+    const previous = notificationPreferences;
+    // Optimistic: a switch that lags behind the finger feels broken. It snaps
+    // back if the save fails.
+    setNotificationPrefs(next);
+    setNotificationBusy(true);
+    setNotificationError("");
+    try {
+      await setNotificationPreferences(pushToken, next);
+    } catch (caught) {
+      setNotificationPrefs(previous);
+      setNotificationError(caught instanceof Error ? caught.message : "That could not be saved.");
+    } finally {
+      setNotificationBusy(false);
+    }
+  }
+
+  /**
+   * Asks for notification permission from the settings page rather than at
+   * launch. By here the buyer has gone looking for it, so the prompt is
+   * expected — which is when people actually say yes.
+   */
+  async function enableNotifications() {
+    if (!session) return;
+    setNotificationBusy(true);
+    setNotificationError("");
+    try {
+      const token = await getPushToken();
+      if (!token) {
+        setNotificationError(
+          "Your phone didn't allow notifications. Turn them on for Dallas Bakery in Settings, then come back.",
+        );
+        return;
+      }
+      const registered = await registerPushToken(session, token, devicePlatform());
+      if (!registered) {
+        setNotificationError("Notifications could not be turned on. Try again in a moment.");
+        return;
+      }
+      setPushToken(token);
+      setNotificationPrefs({ orderUpdates: true, invoiceReminders: true });
+    } finally {
+      setNotificationBusy(false);
+    }
+  }
+
+  /** What closing the account would affect, for the confirmation page. */
+  const loadClosurePreview = useCallback(async (): Promise<ClosurePreview | null> => {
+    if (!session) return null;
+    try {
+      return await getClosurePreview(session);
+    } catch (caught) {
+      setCloseError(caught instanceof Error ? caught.message : "That could not be loaded.");
+      return null;
+    }
+  }, [session]);
+
+  /**
+   * Closes the account for good. The session dies with it — the server stops
+   * recognising a closed account on the very next request — so everything
+   * local is cleared and the app returns to the start.
+   */
+  async function confirmCloseAccount(confirm: string, reason: string) {
+    if (!session) return;
+    setClosing(true);
+    setCloseError("");
+    try {
+      const result = await closeAccount(session, confirm, reason);
+      await unregisterPushToken(pushToken);
+      await clearBuyerSession();
+      setPushToken("");
+      setSession(null);
+      setAccount(null);
+      setProducts([]);
+      setCart({});
+      setInvoices([]);
+      setOpenBalanceCents(0);
+      setStandingOrder(null);
+      setNotificationPrefs(null);
+      setClosureSummary({
+        businessName: result.businessName,
+        ordersRetained: result.ordersRetained,
+        outstandingCents: result.outstandingCents,
+      });
+      setScreen("closed");
+    } catch (caught) {
+      setCloseError(
+        caught instanceof Error
+          ? caught.message
+          : "The account could not be closed. Call (469) 729-4706 and we'll do it for you.",
+      );
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  /**
    * Puts a past order's cases back in the cart. Products that are no longer in
    * the catalog are skipped rather than failing the whole reorder.
    */
@@ -666,6 +817,56 @@ export default function App() {
     );
   }
 
+  // These five render before every account check below, because all of them
+  // must work whether or not anyone is signed in — a customer reading the
+  // privacy notice before handing over any information, and an App Review
+  // reviewer who has not got past the sign-in wall, need the same pages.
+  if (screen === "legal") {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <LegalScreen document={legalDocument} onBack={() => setScreen(returnScreen)} />
+      </>
+    );
+  }
+
+  if (screen === "support") {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <SupportScreen accountEmail={account?.email} onBack={() => setScreen(returnScreen)} />
+      </>
+    );
+  }
+
+  if (screen === "about") {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <AboutScreen
+          onBack={() => setScreen(returnScreen)}
+          onOpenLegal={(document) => openPage("legal", document)}
+          onOpenSupport={() => openPage("support")}
+          version={String(packageJson.version || "1.0.0")}
+        />
+      </>
+    );
+  }
+
+  if (screen === "closed" && closureSummary) {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <AccountClosedScreen
+          businessName={closureSummary.businessName}
+          onDone={() => { setClosureSummary(null); setScreen("welcome"); }}
+          ordersRetained={closureSummary.ordersRetained}
+          outstandingCents={closureSummary.outstandingCents}
+        />
+      </>
+    );
+  }
+
   if (screen === "signin") {
     return (
       <SignInScreen
@@ -708,10 +909,45 @@ export default function App() {
           error={publicError}
           hasTracking={Boolean(trackingToken)}
           onApply={() => setScreen("apply")}
+          onOpenAbout={() => openPage("about")}
+          onOpenLegal={(document) => openPage("legal", document)}
           onOpenStatus={() => setScreen("status")}
+          onOpenSupport={() => openPage("support")}
           onSignIn={() => void handleSignIn()}
           shipping={shipping}
           signingIn={signingIn}
+        />
+      </>
+    );
+  }
+
+  if (screen === "notifications") {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <NotificationSettingsScreen
+          busy={notificationBusy}
+          enabled={Boolean(pushToken)}
+          error={notificationError}
+          onBack={() => setScreen(returnScreen)}
+          onChange={(next) => void changeNotificationPreferences(next)}
+          onEnable={() => void enableNotifications()}
+          preferences={notificationPreferences}
+        />
+      </>
+    );
+  }
+
+  if (screen === "close-account") {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <CloseAccountScreen
+          closing={closing}
+          error={closeError}
+          onBack={() => { setCloseError(""); setScreen(returnScreen); }}
+          onClose={confirmCloseAccount}
+          onLoadPreview={loadClosurePreview}
         />
       </>
     );
@@ -854,7 +1090,7 @@ export default function App() {
     return (
       <>
         <StatusBar style="light" />
-        <LocationsScreen cartCount={totalItems} locations={account.locations} onCart={() => setScreen("cart")} onSelectLocation={selectLocation} onTab={selectTab} selectedLocationId={selectedLocationId} userInitials={userInitials} />
+        <LocationsScreen cartCount={totalItems} locations={account.locations} onCart={() => setScreen("cart")} onRequestLocation={() => openPage("support")} onSelectLocation={selectLocation} onTab={selectTab} selectedLocationId={selectedLocationId} userInitials={userInitials} />
       </>
     );
   }
@@ -879,6 +1115,11 @@ export default function App() {
           documentError={documentError}
           onOpenInvoice={(orderId) => void openDocument("invoice", orderId)}
           onOpenStatement={() => void openDocument("statement")}
+          onOpenSupport={() => openPage("support")}
+          onOpenLegal={(document) => openPage("legal", document)}
+          onOpenNotifications={() => { void loadNotificationPreferences(); openPage("notifications"); }}
+          onOpenAbout={() => openPage("about")}
+          onCloseAccount={() => { setCloseError(""); openPage("close-account"); }}
         />
       </>
     );
