@@ -36,9 +36,10 @@ instruction is a thing you can actually do from `/admin` or a terminal.
 
 ## When something goes wrong with an order
 
-Open the order in the shipping queue and press **What was ordered**. The
-actions are under *If something's wrong*, and underneath them is the order's
-complete history — every change, who made it, and when.
+Open the order in the shipping queue and press **Details & history**. The
+actions are under *If something's wrong*, and underneath them is **Full
+history** — every change to that order, who made it, and when, with a *Print
+this history* link for when a card processor asks.
 
 | What happened | What to do |
 | --- | --- |
@@ -57,7 +58,11 @@ Two things the system will not let you do, on purpose:
   it puts the amount back on the buyer's credit line, which is the real fix.
 
 Every one of these writes a line into the order's history with your email on
-it. That history is never edited or deleted. It is what answers a chargeback,
+it — and so does placing the order, buying a label, handing the boxes to UPS,
+and marking an invoice paid, so the history is the whole story rather than
+only the bad parts. Lines marked *internal* (a UPS failure, your own note on a
+problem) are never shown to the buyer. That history is never edited or
+deleted. It is what answers a chargeback,
 an accountant, or a buyer who remembers the conversation differently.
 
 ---

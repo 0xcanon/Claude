@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { orders } from "../db/schema";
 import { alertOwner } from "./observability.ts";
+import { recordEvent, type Actor } from "./order-events.ts";
 import { bakeryDayStartIso } from "./order-rules.ts";
 import { packagesForOrder, type PackableItem } from "./parcel-packing.ts";
 import { listAllProducts } from "./wholesale-catalog.ts";
@@ -120,6 +121,25 @@ export async function recordOrder(input: NewOrderInput) {
     requestedDeliveryDate: input.requestedDeliveryDate || null,
     status: "paid",
   });
+
+  // The first line of the order's history. Without it, a normal order's
+  // history is blank until something goes wrong — which is exactly when you
+  // want to know what it looked like before.
+  await recordEvent({
+    orderId: id,
+    kind: "placed",
+    summary: input.paymentTerms === "account"
+      ? `Ordered on account${input.invoiceDueAt ? `, invoice due ${input.invoiceDueAt}` : ""}.`
+      : "Ordered and paid by card.",
+    detail: [
+      ...input.items.map((item) => `${item.quantity} × ${item.name}`),
+      `Total $${(input.totalCents / 100).toFixed(2)}`,
+      input.poNumber ? `Their PO ${input.poNumber}` : "",
+      input.requestedDeliveryDate ? `Asked for delivery ${input.requestedDeliveryDate}` : "",
+    ].filter(Boolean).join("\n"),
+    actor: input.email ? { kind: "buyer", email: input.email } : { kind: "system" },
+  });
+
   return { created: true, id, orderNumber: nextNumber, existingStatus: "" };
 }
 
@@ -173,7 +193,7 @@ export type LabelOutcome = {
  * result. Failures are recorded per order and returned alongside successes:
  * a single bad address never aborts the day's batch.
  */
-export async function createLabelsForOrders(ids: string[]) {
+export async function createLabelsForOrders(ids: string[], actor: Actor = { kind: "system" }) {
   const db = getDb();
   const settings = await getWholesaleShippingSettings();
   const fallbackParcel = {
@@ -226,6 +246,13 @@ export async function createLabelsForOrders(ids: string[]) {
           updatedAt: sql`CURRENT_TIMESTAMP`,
         })
         .where(eq(orders.id, order.id));
+      await recordEvent({
+        orderId: order.id,
+        kind: "labeled",
+        summary: `Packed and labeled — UPS ${result.trackingNumber}.`,
+        detail: `${packages.length} parcel${packages.length === 1 ? "" : "s"}`,
+        actor,
+      });
       outcomes.push({
         id: order.id,
         orderNumber: order.orderNumber,
@@ -238,6 +265,16 @@ export async function createLabelsForOrders(ids: string[]) {
         .update(orders)
         .set({ labelError: result.error, updatedAt: sql`CURRENT_TIMESTAMP` })
         .where(eq(orders.id, order.id));
+      // A failed label is part of this order's story too — it explains the
+      // gap between "paid" and "shipped" that someone will ask about later.
+      await recordEvent({
+        orderId: order.id,
+        kind: "note",
+        summary: "UPS would not produce a label.",
+        detail: result.error,
+        actor,
+        buyerVisible: false,
+      });
       void alertOwner("ups-label", `Order #${order.orderNumber}: ${result.error}`, {
         orderNumber: order.orderNumber,
         city: order.city,
@@ -268,14 +305,25 @@ export async function getLabelPayloads(ids: string[]) {
     .where(inArray(orders.id, ids));
 }
 
-export async function markShipped(ids: string[]) {
+export async function markShipped(ids: string[], actor: Actor = { kind: "system" }) {
   if (!ids.length) return [];
   const db = getDb();
   await db
     .update(orders)
     .set({ status: "shipped", shippedAt: sql`CURRENT_TIMESTAMP`, updatedAt: sql`CURRENT_TIMESTAMP` })
     .where(inArray(orders.id, ids));
-  return db.select().from(orders).where(inArray(orders.id, ids));
+  const shipped = await db.select().from(orders).where(inArray(orders.id, ids));
+  for (const order of shipped) {
+    await recordEvent({
+      orderId: order.id,
+      kind: "shipped",
+      summary: order.trackingNumber
+        ? `Handed to UPS — tracking ${order.trackingNumber}.`
+        : "Handed to UPS.",
+      actor,
+    });
+  }
+  return shipped;
 }
 
 export async function markTrackingEmailed(id: string) {
@@ -290,7 +338,7 @@ export async function markTrackingEmailed(id: string) {
  * back to the buyer's available credit. Idempotent, and a no-op for card
  * orders — they were paid at checkout and never held credit.
  */
-export async function markInvoicePaid(id: string) {
+export async function markInvoicePaid(id: string, actor: Actor = { kind: "system" }) {
   const db = getDb();
   const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   if (!order) return null;
@@ -300,24 +348,15 @@ export async function markInvoicePaid(id: string) {
     .set({ invoicePaidAt: sql`CURRENT_TIMESTAMP`, updatedAt: sql`CURRENT_TIMESTAMP` })
     .where(eq(orders.id, id))
     .returning();
-  return updated || null;
-}
-
-/**
- * Marks an order refunded after Stripe confirms the refund. Refunded orders
- * leave the unshipped queue (they must not be packed) but stay in "all" as
- * the record of what happened.
- */
-export async function markRefunded(id: string) {
-  const db = getDb();
-  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
-  if (!order) return null;
-  if (order.status === "refunded") return order;
-  const [updated] = await db
-    .update(orders)
-    .set({ status: "refunded", updatedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(orders.id, id))
-    .returning();
+  if (updated) {
+    await recordEvent({
+      orderId: id,
+      kind: "invoice_paid",
+      summary: `Invoice settled — $${(order.totalCents / 100).toFixed(2)} back on their credit line.`,
+      actor,
+      amountCents: order.totalCents,
+    });
+  }
   return updated || null;
 }
 

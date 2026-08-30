@@ -6,7 +6,6 @@ import {
   listOrders,
   listTodaysUnlabeled,
   markInvoicePaid,
-  markRefunded,
   markShipped,
   markTrackingEmailed,
   weeklySummary,
@@ -14,7 +13,6 @@ import {
 import { ordersToCsv } from "../../../orders-csv.ts";
 import { orderShippedPush } from "../../../push-messages.ts";
 import { pushToBuyer } from "../../../push-notifications.ts";
-import { createRefund } from "../../../stripe.ts";
 import { trackingUrl } from "../../../order-status.ts";
 import { mergeZplLabels, upsConfigured, upsIsProduction } from "../../../ups-shipping.ts";
 
@@ -144,6 +142,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
 
+  // Whoever pressed the button. It goes into each order's history, so
+  // "who shipped this" has an answer months later.
+  const actor = { kind: "owner" as const, email: guard.admin!.email };
+
   const ids = Array.isArray(body.ids)
     ? body.ids.filter((value): value is string => typeof value === "string").slice(0, 200)
     : [];
@@ -153,13 +155,13 @@ export async function POST(request: Request) {
     if (!pending.length) {
       return Response.json({ results: [], message: "Every order placed today already has a label." });
     }
-    const results = await createLabelsForOrders(pending.map((order) => order.id));
+    const results = await createLabelsForOrders(pending.map((order) => order.id), actor);
     return Response.json({ results });
   }
 
   if (body.action === "create-labels") {
     if (!ids.length) return Response.json({ error: "Select at least one order." }, { status: 400 });
-    const results = await createLabelsForOrders(ids);
+    const results = await createLabelsForOrders(ids, actor);
     return Response.json({ results });
   }
 
@@ -181,7 +183,7 @@ export async function POST(request: Request) {
 
   if (body.action === "mark-shipped") {
     if (!ids.length) return Response.json({ error: "Select at least one order." }, { status: 400 });
-    const shipped = await markShipped(ids);
+    const shipped = await markShipped(ids, actor);
     // Tracking emails are the promise the site already makes to buyers; this
     // is the moment it is kept. A mail failure must not un-ship the order.
     for (const order of shipped) {
@@ -201,38 +203,14 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "refund") {
-    // One order at a time, deliberately: a refund is money leaving the
-    // account, and a batch button invites a mis-click.
-    const [id] = ids;
-    if (!id || ids.length !== 1) {
-      return Response.json({ error: "Refund one order at a time." }, { status: 400 });
-    }
-    const [order] = await listOrders({ status: "all" }).then((rows) => rows.filter((row) => row.id === id));
-    if (!order) return Response.json({ error: "Order not found." }, { status: 404 });
-    if (order.status === "refunded") return Response.json({ refunded: true, orderNumber: order.orderNumber });
-    if (order.status === "shipped") {
-      return Response.json(
-        { error: `#${order.orderNumber} already shipped. Refund it from Stripe if the boxes are coming back.` },
-        { status: 400 },
-      );
-    }
-    if (order.paymentTerms === "account") {
-      // Nothing was charged, so there is nothing to send back through
-      // Stripe — cancelling the order releases its amount to the buyer's
-      // available credit. If the invoice was already paid outside the
-      // system, that money is settled outside the system too.
-      await markRefunded(order.id);
-      return Response.json({ refunded: true, onAccount: true, orderNumber: order.orderNumber });
-    }
-    if (!order.stripePaymentIntentId) {
-      return Response.json({ error: "This order has no payment to refund." }, { status: 400 });
-    }
-    const refund = await createRefund(order.stripePaymentIntentId);
-    if (!refund.ok) {
-      return Response.json({ error: `Stripe declined the refund: ${refund.message}` }, { status: 502 });
-    }
-    await markRefunded(order.id);
-    return Response.json({ refunded: true, orderNumber: order.orderNumber });
+    // The old full-refund-only button. It moved money without writing a line
+    // into the order's history, which is the one thing a refund must never
+    // do. /api/admin/order-actions replaced it: partial amounts, a recorded
+    // reason, and an entry naming who pressed it.
+    return Response.json(
+      { error: "Refunds now happen on the order itself, where the reason is recorded." },
+      { status: 410 },
+    );
   }
 
   if (body.action === "mark-invoice-paid") {
@@ -242,7 +220,7 @@ export async function POST(request: Request) {
     if (!id || ids.length !== 1) {
       return Response.json({ error: "Mark one invoice at a time." }, { status: 400 });
     }
-    const order = await markInvoicePaid(id);
+    const order = await markInvoicePaid(id, actor);
     if (!order) return Response.json({ error: "Order not found." }, { status: 404 });
     if (order.paymentTerms !== "account") {
       return Response.json({ error: `#${order.orderNumber} was paid by card — there is no invoice.` }, { status: 400 });

@@ -1650,3 +1650,27 @@ a.admin-tracking { display: block; color: var(--tomato); font-size: 0.72rem; }
   background: rgba(105, 114, 88, 0.14); color: #33482f;
   font-size: 0.84rem; border-radius: 3px;
 }
+
+/* The order history's own heading: a count, and a way to print it on its own
+   — a dispute response is a piece of paper, not a screenshot. */
+.admin-lifecycle-history-head {
+  display: flex; align-items: baseline; gap: 0.9rem;
+  margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+}
+.admin-lifecycle-history-head + .admin-lifecycle-hint { margin-bottom: 1rem; }
+.admin-history-count {
+  margin-left: 0.5rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: rgba(43, 26, 19, 0.1); color: var(--ink);
+  font-size: 0.62rem; letter-spacing: 0;
+}
+.admin-history-print {
+  margin-left: auto; font: inherit; font-size: 0.72rem;
+  background: none; border: 0; color: var(--tomato);
+  text-decoration: underline; cursor: pointer;
+}
+@media print {
+  /* Printing an order prints its history, not the whole dashboard. */
+  .admin-lifecycle-buttons, .admin-lifecycle-form, .admin-history-print,
+  .admin-queue-actions, .admin-filters, .admin-bake-sheet, .admin-weekly { display: none !important; }
+  .admin-lifecycle-history li { break-inside: avoid; }
+}

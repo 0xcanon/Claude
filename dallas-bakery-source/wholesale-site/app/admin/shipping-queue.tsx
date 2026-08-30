@@ -399,7 +399,7 @@ export function ShippingQueue() {
                     aria-expanded={openOrder === order.id}
                     onClick={() => setOpenOrder(openOrder === order.id ? "" : order.id)}
                   >
-                    {openOrder === order.id ? "Hide items" : "What was ordered"}
+                    {openOrder === order.id ? "Hide details" : "Details & history"}
                   </button>
                 </td>
                 <td data-label="Boxes">{order.boxCount}{order.loafCount ? <small>{order.loafCount} loaves</small> : null}</td>

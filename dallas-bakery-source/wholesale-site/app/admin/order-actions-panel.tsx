@@ -331,9 +331,22 @@ export function OrderActionsPanel({
       {error && <p className="admin-lifecycle-error">{error}</p>}
       {note && <p className="admin-lifecycle-note">{note}</p>}
 
-      <h4>What has happened to this order</h4>
+      <div className="admin-lifecycle-history-head">
+        <h4 id={`history-${order.id}`}>
+          Full history{history.length > 0 && <span className="admin-history-count">{history.length}</span>}
+        </h4>
+        {history.length > 0 && (
+          <button type="button" className="admin-history-print" onClick={() => window.print()}>
+            Print this history
+          </button>
+        )}
+      </div>
+      <p className="admin-lifecycle-hint">
+        Every change to this order, in order, with who made it. Nothing here is ever
+        edited or removed — this is what you send a card processor in a dispute.
+      </p>
       {history.length === 0 ? (
-        <p className="admin-lifecycle-hint">Nothing but the order itself, so far.</p>
+        <p className="admin-lifecycle-hint">Nothing recorded yet.</p>
       ) : (
         <ol className="admin-lifecycle-history">
           {history.map((entry) => (

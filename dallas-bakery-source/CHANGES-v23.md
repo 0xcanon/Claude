@@ -29,9 +29,17 @@ Open any order in the shipping queue. Under *If something's wrong*:
   way out; an invoiced order releases the credit, because nothing was charged.
 - **Mark delivered** once UPS says so.
 
-Under those buttons is the order's complete history, in order, with a name
-against every line. It is never edited and never deleted. When a card is
-disputed six months from now, that is your evidence.
+Under those buttons is **Full history** — every change to the order, in order,
+with a name against every line, and a *Print this history* link, because a
+dispute response is a piece of paper rather than a screenshot. It is never
+edited and never deleted.
+
+The history covers the whole order, not only the parts that went wrong:
+placing it, buying a label, a label UPS refused, handing the boxes over,
+settling the invoice, and everything above. An order that went perfectly still
+has a history. Lines the bakery should keep to itself — a UPS failure, your
+note on a problem — are marked *internal* and never reach the buyer, who sees
+the same story with those lines removed.
 
 **Two things it will not let you do**, deliberately:
 

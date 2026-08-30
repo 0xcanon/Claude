@@ -50,6 +50,15 @@ immutable financial history.* All five:
 - Every move writes an `order_events` row with the actor (`owner:email`,
   `buyer:email`, `system`, `stripe`), a summary, and a detail. Rows are only
   ever inserted. That table is the dispute evidence.
+- **The trail starts at the order, not at the first problem.** Placing an
+  order, buying a label, a label UPS refused, handing the boxes over, and
+  settling an invoice all write a line too — so an order that went perfectly
+  still has a history, and the gap between "paid" and "shipped" has an
+  explanation in it. Fulfilment actions are signed with the admin who pressed
+  them, the same as the lifecycle ones.
+- The old full-refund-only endpoint, which moved money without writing
+  anything down, now returns 410 and points at the audited path. An
+  unaudited way to move money is not something to leave lying around.
 - Cancelling a card order refunds it in full on the way out, and the buyer
   sees the reason in their own order history.
 
