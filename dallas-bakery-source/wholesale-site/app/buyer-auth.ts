@@ -191,6 +191,56 @@ export async function readSessionToken(token: string): Promise<BuyerSessionClaim
   return { email, expiresAt };
 }
 
+/** How long a printable invoice or statement link stays good. */
+export const DOCUMENT_LINK_TTL_MINUTES = 20;
+
+export type DocumentClaims = {
+  kind: "invoice" | "statement";
+  /** The order id for an invoice; empty for a statement. */
+  ref: string;
+  applicationId: string;
+  expiresAt: number;
+};
+
+/**
+ * Mints a short-lived link to one printable document.
+ *
+ * An invoice has to open in a browser tab — that is where printing and
+ * "save as PDF" live — and a plain tab cannot send an Authorization header.
+ * So the buyer's signed-in app asks for a link, and gets back a URL carrying
+ * a token that is good for one business, one document, and twenty minutes.
+ * The prefix keeps a session token from ever validating as a document token.
+ */
+export async function createDocumentToken(claims: Omit<DocumentClaims, "expiresAt">) {
+  const expiresAt = Date.now() + DOCUMENT_LINK_TTL_MINUTES * 60_000;
+  const payload = `doc1|${claims.kind}|${claims.ref}|${claims.applicationId}|${expiresAt}`;
+  const signature = await hmac(payload, sessionSecret());
+  return {
+    token: `${base64Url(encoder().encode(payload))}.${signature}`,
+    expiresAt,
+  };
+}
+
+export async function readDocumentToken(token: string): Promise<DocumentClaims | null> {
+  const [encodedPayload, signature] = String(token || "").split(".");
+  if (!encodedPayload || !signature) return null;
+  let payload: string;
+  try {
+    payload = atob(encodedPayload.replace(/-/g, "+").replace(/_/g, "/"));
+  } catch {
+    return null;
+  }
+  const expected = await hmac(payload, sessionSecret());
+  if (!timingSafeEqual(expected, signature)) return null;
+
+  const [prefix, kind, ref, applicationId, expires] = payload.split("|");
+  if (prefix !== "doc1") return null;
+  if (kind !== "invoice" && kind !== "statement") return null;
+  const expiresAt = Number(expires);
+  if (!applicationId || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
+  return { kind, ref: ref || "", applicationId, expiresAt };
+}
+
 /**
  * Verifies a submitted code. Every failure burns an attempt, and the code is
  * deleted on success so it cannot be replayed.

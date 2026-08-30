@@ -8,11 +8,12 @@
 
 import { getAdminAccount, getAuthorizedAdmin } from "../../../admin-auth";
 import {
+  catalogWithStock,
   createProduct,
   deleteProduct,
   getProduct,
-  listAllProducts,
   setProductActive,
+  setProductInStock,
   updateProduct,
   type ProductInput,
 } from "../../../wholesale-catalog.ts";
@@ -40,24 +41,40 @@ export async function GET() {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
   return Response.json(
-    { products: await listAllProducts() },
+    { products: await catalogWithStock() },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+function text(value: unknown, max: number) {
+  return String(value ?? "").trim().slice(0, max);
 }
 
 function readInput(body: Record<string, unknown>): ProductInput {
   return {
     sku: String(body.sku || "").trim().toUpperCase(),
     handle: String(body.handle || "").trim().toLowerCase(),
-    title: String(body.title || "").trim().slice(0, 120),
-    description: String(body.description || "").trim().slice(0, 500),
+    title: text(body.title, 120),
+    description: text(body.description, 500),
     loafPriceCents: Math.round(Number(body.loafPriceCents)),
     loavesPerCase: Math.round(Number(body.loavesPerCase)),
-    imageUrl: String(body.imageUrl || "").trim().slice(0, 300),
+    imageUrl: text(body.imageUrl, 300),
     boxWeightOz: Math.round(Number(body.boxWeightOz)),
     boxLengthIn: Math.round(Number(body.boxLengthIn)),
     boxWidthIn: Math.round(Number(body.boxWidthIn)),
     boxHeightIn: Math.round(Number(body.boxHeightIn)),
+    // The label copy. Ingredients get real room — a full statement with
+    // sub-ingredients in parentheses runs long, and truncating one would
+    // publish an incomplete allergen declaration.
+    ingredients: text(body.ingredients, 2000),
+    allergens: text(body.allergens, 300),
+    netWeight: text(body.netWeight, 60),
+    shelfLife: text(body.shelfLife, 120),
+    storage: text(body.storage, 300),
+    certifications: text(body.certifications, 200),
+    inStock: body.inStock !== false,
+    dailyCapacityCases: Math.round(Number(body.dailyCapacityCases)) || 0,
+    maxCasesPerOrder: Math.round(Number(body.maxCasesPerOrder)) || 0,
     sortOrder: Math.round(Number(body.sortOrder)) || 0,
   };
 }
@@ -80,13 +97,21 @@ export async function POST(request: Request) {
   if (action === "set-active") {
     if (!(await getProduct(sku))) return Response.json({ error: "That product no longer exists." }, { status: 404 });
     await setProductActive(sku, body.active !== false);
-    return Response.json({ products: await listAllProducts() });
+    return Response.json({ products: await catalogWithStock() });
+  }
+
+  // The morning "we ran out" switch, kept separate from retiring a product so
+  // one click sells out a bread and one click brings it back.
+  if (action === "set-stock") {
+    if (!(await getProduct(sku))) return Response.json({ error: "That product no longer exists." }, { status: 404 });
+    await setProductInStock(sku, body.inStock !== false);
+    return Response.json({ products: await catalogWithStock() });
   }
 
   if (action === "delete") {
     if (!(await getProduct(sku))) return Response.json({ error: "That product no longer exists." }, { status: 404 });
     await deleteProduct(sku);
-    return Response.json({ products: await listAllProducts() });
+    return Response.json({ products: await catalogWithStock() });
   }
 
   const input = readInput(body);
@@ -94,5 +119,5 @@ export async function POST(request: Request) {
     ? await updateProduct(sku, input)
     : await createProduct(input);
   if (problem) return Response.json({ error: problem }, { status: 400 });
-  return Response.json({ products: await listAllProducts() });
+  return Response.json({ products: await catalogWithStock() });
 }

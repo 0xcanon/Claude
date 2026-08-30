@@ -25,6 +25,19 @@ export type CatalogProductRow = {
   boxLengthIn: number;
   boxWidthIn: number;
   boxHeightIn: number;
+  /** Food spec shown to buyers — the same words as the physical label. */
+  ingredients: string;
+  allergens: string;
+  netWeight: string;
+  shelfLife: string;
+  storage: string;
+  certifications: string;
+  /** Sold-out switch. False hides the bread from ordering without deleting it. */
+  inStock: boolean;
+  /** Cases the bakery can make in a day. 0 means no limit. */
+  dailyCapacityCases: number;
+  /** Cap on one order's cases of this bread. 0 means no limit. */
+  maxCasesPerOrder: number;
   active: boolean;
   sortOrder: number;
 };
@@ -34,6 +47,61 @@ export type CatalogProductRow = {
  * entries (and absent maps) mean the catalog price applies.
  */
 export type PriceOverrides = Record<string, number>;
+
+/** Cases of each SKU committed by today's orders, keyed by SKU. */
+export type CommittedCases = Record<string, number>;
+
+export type StockState = {
+  /** True when a buyer can add this bread to a cart at all. */
+  available: boolean;
+  /** Cases still sellable today, or null when there is no daily limit. */
+  remainingToday: number | null;
+  /** Largest number of cases one order may take, or null when uncapped. */
+  maxPerOrder: number | null;
+  /** What the buyer is told, e.g. "Sold out" or "Only 4 cases left today". */
+  label: string;
+};
+
+function caseWord(count: number) {
+  return `${count} case${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * Turns a product's stock settings and today's commitments into the one
+ * sentence a buyer sees. The wording never mentions capacity or ovens — a
+ * buyer only needs to know what they can order.
+ */
+export function stockStateFor(
+  product: Pick<CatalogProductRow, "inStock" | "dailyCapacityCases" | "maxCasesPerOrder">,
+  committedCases = 0,
+): StockState {
+  const maxPerOrder = product.maxCasesPerOrder > 0 ? product.maxCasesPerOrder : null;
+  if (!product.inStock) {
+    return { available: false, remainingToday: 0, maxPerOrder, label: "Sold out" };
+  }
+  if (product.dailyCapacityCases <= 0) {
+    return {
+      available: true,
+      remainingToday: null,
+      maxPerOrder,
+      label: maxPerOrder ? `Up to ${caseWord(maxPerOrder)} per order` : "In stock",
+    };
+  }
+  const remaining = Math.max(0, product.dailyCapacityCases - Math.max(0, committedCases));
+  if (remaining === 0) {
+    return { available: false, remainingToday: 0, maxPerOrder, label: "Fully booked today" };
+  }
+  const orderCap = maxPerOrder ? Math.min(maxPerOrder, remaining) : remaining;
+  // Only warn when the day is genuinely running short; a full oven should not
+  // look like scarcity marketing.
+  const low = remaining <= Math.max(3, Math.ceil(product.dailyCapacityCases * 0.2));
+  return {
+    available: true,
+    remainingToday: remaining,
+    maxPerOrder: orderCap,
+    label: low ? `Only ${caseWord(remaining)} left today` : "In stock",
+  };
+}
 
 function loafPriceFor(product: CatalogProductRow, overrides?: PriceOverrides) {
   const override = overrides?.[product.sku];
@@ -89,6 +157,12 @@ export function priceCartFromProducts(
   lines: CartLine[],
   shipping: { rateCents: number },
   overrides?: PriceOverrides,
+  /**
+   * Cases of each SKU already committed by today's orders. Used with the
+   * product's daily capacity so the catalog cannot sell more bread than the
+   * bakery can bake. Absent means "nothing committed yet".
+   */
+  committedCasesBySku?: Record<string, number>,
 ): PricedCart {
   const bySku = new Map(products.filter((product) => product.active).map((product) => [product.sku, product]));
   const priced: PricedLine[] = [];
@@ -106,6 +180,29 @@ export function priceCartFromProducts(
       return { ok: false, error: "Case quantities must be whole numbers." };
     }
     if (cases === 0) continue;
+
+    // Stock and capacity, checked before any money is computed.
+    if (!product.inStock) {
+      return { ok: false, error: `${product.title} is sold out right now. Remove it to place the rest of your order.` };
+    }
+    if (product.maxCasesPerOrder > 0 && cases > product.maxCasesPerOrder) {
+      return {
+        ok: false,
+        error: `${product.title} is limited to ${product.maxCasesPerOrder} case${product.maxCasesPerOrder === 1 ? "" : "s"} per order.`,
+      };
+    }
+    if (product.dailyCapacityCases > 0) {
+      const committed = Math.max(0, Number(committedCasesBySku?.[product.sku] || 0));
+      const remaining = Math.max(0, product.dailyCapacityCases - committed);
+      if (cases > remaining) {
+        return {
+          ok: false,
+          error: remaining === 0
+            ? `${product.title} is fully booked for today. Try again tomorrow, or call us.`
+            : `Only ${remaining} case${remaining === 1 ? " " : "s "}of ${product.title} ${remaining === 1 ? "is" : "are"} left today.`,
+        };
+      }
+    }
 
     const unitAmountCents = loafPriceFor(product, overrides) * product.loavesPerCase;
     priced.push({
@@ -194,7 +291,18 @@ export function validateProductInput(input: {
   boxLengthIn: number;
   boxWidthIn: number;
   boxHeightIn: number;
+  dailyCapacityCases?: number;
+  maxCasesPerOrder?: number;
 }): string | null {
+  for (const [label, value] of [
+    ["Daily capacity", input.dailyCapacityCases],
+    ["Per-order limit", input.maxCasesPerOrder],
+  ] as const) {
+    if (value === undefined) continue;
+    if (!Number.isInteger(value) || value < 0 || value > 100_000) {
+      return `${label} must be a whole number of cases (0 means no limit).`;
+    }
+  }
   if (!/^[A-Z0-9][A-Z0-9-]{2,39}$/.test(input.sku)) {
     return "SKU must be 3-40 characters: capital letters, numbers, and dashes (e.g. WS-BARBARI-25).";
   }

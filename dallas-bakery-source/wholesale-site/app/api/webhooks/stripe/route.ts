@@ -18,6 +18,8 @@ import {
 import { cutoffState } from "../../../order-rules.ts";
 import { recordOrder, type NewOrderInput, type OrderChannel, type OrderItem } from "../../../orders-service.ts";
 import { priceOverridesFor } from "../../../customer-pricing.ts";
+import { orderPlacedPush, ownerNewOrderPush } from "../../../push-messages.ts";
+import { pushToBuyer, pushToOwner } from "../../../push-notifications.ts";
 import { getWholesaleShippingSettings } from "../../../shipping-settings.ts";
 import { decodeCartLines, priceCart } from "../../../wholesale-catalog.ts";
 
@@ -187,6 +189,10 @@ async function recordFromPaymentIntent(intent: StripePaymentIntentEvent) {
       totalCents: capturedCents || cart.totalCents,
       applicationId: String(meta.applicationId || ""),
       paymentTerms: "card",
+      // Carried through from checkout so the packing slip and the buyer's
+      // accounts-payable file agree on the same reference.
+      poNumber: String(meta.poNumber || ""),
+      requestedDeliveryDate: String(meta.requestedDeliveryDate || ""),
     };
     const result = await recordOrder(input);
     await announceOrder(input, result, cart.caseCount);
@@ -232,6 +238,27 @@ async function announceOrder(
   if (input.channel === "wholesale" && input.email) {
     await sendMail(buyerOrderConfirmationEmail(details));
   }
+
+  if (input.channel !== "wholesale") return;
+  if (input.applicationId) {
+    await pushToBuyer(
+      input.applicationId,
+      orderPlacedPush({
+        orderNumber: result.orderNumber,
+        caseCount,
+        shipsToday: details.shipsToday,
+      }),
+    );
+  }
+  await pushToOwner(
+    ownerNewOrderPush({
+      orderNumber: result.orderNumber,
+      businessName: input.customerName,
+      caseCount,
+      totalCents: input.totalCents,
+      paymentTerms: input.paymentTerms || "card",
+    }),
+  );
 }
 
 export async function POST(request: Request) {

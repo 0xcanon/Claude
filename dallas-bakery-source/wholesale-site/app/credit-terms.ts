@@ -146,3 +146,33 @@ export function validateCreditLimitCents(value: number): string | null {
   }
   return null;
 }
+
+/* ------------------------------------------------------ invoice reminders --
+ * When a buyer hears about an unpaid invoice. Three moments matter: a few
+ * days before the due date, the morning it is due, and — once it is late,
+ * which locks their account to card — on a weekly cadence rather than daily.
+ * An app that nags gets its notifications switched off, and then the
+ * important one never arrives.
+ */
+
+/** How many days before the due date the first reminder goes out. */
+export const REMINDER_LEAD_DAYS = 3;
+/** After the due date, remind on this cadence rather than every day. */
+export const OVERDUE_REMINDER_EVERY_DAYS = 7;
+
+export type ReminderKind = "due-soon" | "due-today" | "overdue";
+
+/**
+ * Whether an invoice gets a reminder today, given the days left before it is
+ * due (negative once it is late).
+ */
+export function reminderKindFor(daysUntilDue: number): ReminderKind | null {
+  if (!Number.isInteger(daysUntilDue)) return null;
+  if (daysUntilDue === REMINDER_LEAD_DAYS) return "due-soon";
+  if (daysUntilDue === 0) return "due-today";
+  if (daysUntilDue < 0) {
+    const daysLate = -daysUntilDue;
+    return daysLate % OVERDUE_REMINDER_EVERY_DAYS === 0 ? "overdue" : null;
+  }
+  return null;
+}

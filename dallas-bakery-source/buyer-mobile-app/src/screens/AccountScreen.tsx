@@ -2,11 +2,12 @@ import { Linking, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react
 
 import { AppHeader } from "../components/AppHeader";
 import { BottomNav } from "../components/BottomNav";
+import { InvoicesCard } from "../components/InvoicesCard";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { StandingOrderCard } from "../components/StandingOrderCard";
 import type { StandingOrderInfo } from "../lib/storefront";
 import { colors, fonts } from "../theme";
-import type { BuyerAccount, MainTab } from "../types";
+import type { BuyerAccount, BuyerInvoice, MainTab } from "../types";
 
 type Props = {
   account: BuyerAccount;
@@ -18,6 +19,13 @@ type Props = {
   standingBusy: boolean;
   standingOrder: StandingOrderInfo | null;
   userInitials: string;
+  invoices: BuyerInvoice[];
+  openBalanceCents: number;
+  termsLabel: string;
+  documentBusyId: string;
+  documentError: string;
+  onOpenInvoice: (orderId: string) => void;
+  onOpenStatement: () => void;
 };
 
 export function AccountScreen({
@@ -30,6 +38,13 @@ export function AccountScreen({
   standingBusy,
   standingOrder,
   userInitials,
+  invoices,
+  openBalanceCents,
+  termsLabel,
+  documentBusyId,
+  documentError,
+  onOpenInvoice,
+  onOpenStatement,
 }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
@@ -53,6 +68,16 @@ export function AccountScreen({
           onSelectWeekday={() => undefined}
           standingOrder={standingOrder}
           weekday={standingOrder?.weekday ?? 2}
+        />
+
+        <InvoicesCard
+          busyId={documentBusyId}
+          error={documentError}
+          invoices={invoices}
+          onOpenInvoice={onOpenInvoice}
+          onOpenStatement={onOpenStatement}
+          openBalanceCents={openBalanceCents}
+          termsLabel={termsLabel}
         />
 
         <View style={styles.menu}>

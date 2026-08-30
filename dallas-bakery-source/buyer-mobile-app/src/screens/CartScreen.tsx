@@ -2,24 +2,36 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "rea
 
 import { BrandLockup } from "../components/BrandLockup";
 import { LocationSelector } from "../components/LocationSelector";
+import { OrderPaperwork } from "../components/OrderPaperwork";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { CutoffBanner } from "../components/CutoffBanner";
 import { StandingOrderCard } from "../components/StandingOrderCard";
 import { caseLabel, cartLoaves, cartQuantity, cartSubtotal, formatMoney, loafLabel, loavesPerCase, shippingEstimate } from "../lib/format";
 import type { CutoffState, StandingOrderInfo } from "../lib/storefront";
 import { colors, fonts } from "../theme";
-import type { BuyerLocation, CatalogProduct, CartQuantityMap, ShippingSettings } from "../types";
+import type {
+  BuyerLocation,
+  CartQuantityMap,
+  CatalogProduct,
+  DeliveryWindow,
+  ShippingSettings,
+} from "../types";
 
 type Props = {
   cart: CartQuantityMap;
   checkoutError: string;
   checkingOut: boolean;
   cutoff: CutoffState | null;
+  deliveryWindow: DeliveryWindow | null;
   locations: BuyerLocation[];
   onBack: () => void;
   onCheckout: () => void;
   onQuantity: (product: CatalogProduct, quantity: number) => void;
   onSelectLocation: (id: string) => void;
+  onChangePoNumber: (value: string) => void;
+  onChangeDeliveryDate: (value: string) => void;
+  poNumber: string;
+  requestedDeliveryDate: string;
   products: CatalogProduct[];
   selectedLocationId: string;
   shipping: ShippingSettings;
@@ -37,11 +49,16 @@ export function CartScreen({
   checkoutError,
   checkingOut,
   cutoff,
+  deliveryWindow,
   locations,
   onBack,
   onCheckout,
   onQuantity,
   onSelectLocation,
+  onChangePoNumber,
+  onChangeDeliveryDate,
+  poNumber,
+  requestedDeliveryDate,
   products,
   selectedLocationId,
   shipping,
@@ -108,6 +125,14 @@ export function CartScreen({
           <Text style={styles.shippingKicker}>LIVE BOX SHIPPING</Text>
           <Text style={styles.shippingText}>{shipping.formattedRate} per case — {caseLabel(quantity)} ships as {estimate.boxes} {estimate.boxes === 1 ? "box" : "boxes"} ({loafLabel(loaves)}). Bakery items are not taxed in Texas — the total above is the total charged.</Text>
         </View>
+        <OrderPaperwork
+          deliveryWindow={deliveryWindow}
+          onChangeDeliveryDate={onChangeDeliveryDate}
+          onChangePoNumber={onChangePoNumber}
+          poNumber={poNumber}
+          requestedDeliveryDate={requestedDeliveryDate}
+        />
+
         {!!checkoutError && <Text style={styles.error}>{checkoutError}</Text>}
         <PrimaryButton disabled={!quantity || !selectedLocationId} label="CONTINUE SECURELY" loading={checkingOut} onPress={onCheckout} />
         <StandingOrderCard

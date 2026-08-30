@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
+import { runInvoiceReminders } from "../app/invoice-reminders.ts";
 import { runDueStandingOrders } from "../app/standing-orders.ts";
 
 interface Env {
@@ -76,16 +77,27 @@ const worker = {
 
 /**
  * Daily cron (triggers.crons in wrangler.deploy.jsonc): charge the standing
- * orders due today. Each order's failure is contained and reported inside
- * runDueStandingOrders, so the handler itself only has to show up.
+ * orders due today, then send the day's invoice reminders. Each job contains
+ * and reports its own failures, so the handler itself only has to show up —
+ * and the two are kept independent so a failure in one still lets the other
+ * run.
  */
 const scheduled = async (_event: { cron: string }, _env: Env, ctx: ExecutionContext) => {
   ctx.waitUntil(
-    runDueStandingOrders().then((outcomes) => {
-      if (outcomes.length) {
-        console.log(`Standing orders run: ${outcomes.filter((o) => o.ok).length}/${outcomes.length} charged.`);
-      }
-    }),
+    runDueStandingOrders()
+      .then((outcomes) => {
+        if (outcomes.length) {
+          console.log(`Standing orders run: ${outcomes.filter((o) => o.ok).length}/${outcomes.length} charged.`);
+        }
+      })
+      .catch((caught) => console.error("Standing orders run failed:", caught)),
+  );
+  ctx.waitUntil(
+    runInvoiceReminders()
+      .then((outcomes) => {
+        if (outcomes.length) console.log(`Invoice reminders sent: ${outcomes.length}.`);
+      })
+      .catch((caught) => console.error("Invoice reminder run failed:", caught)),
   );
 };
 

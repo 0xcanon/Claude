@@ -124,10 +124,32 @@ Everything happens at `https://dallasbakery.net/admin`:
 - **Products** — add a bread, change a price or description, set each item's
   packed **box weight and size** (UPS buys labels from those exact numbers),
   hide an item, or delete it. Changes appear on the website and app instantly.
+  Each bread also carries its **label copy** — ingredients, the "contains"
+  allergen line, net weight, shelf life, storage, certifications. Copy it word
+  for word off the bag: a chef building an allergen matrix will rely on it,
+  and so will their health inspector.
+- **Ran out of something?** Press **Mark sold out** on that bread. Buyers
+  still see it, marked sold out, and can't order it; one click puts it back
+  tomorrow. That's different from **Hide**, which retires a product. You can
+  also set **cases you can bake in a day** — the site counts today's orders
+  and stops selling once the ovens are committed — and a **most cases in one
+  order** cap. Leave either at 0 for no limit.
 - **Approvals** — new wholesale applications wait here; approve or decline.
   Approved buyers can order immediately. Add extra delivery addresses for a
   multi-store business on its card.
 - **Bake sheet** — each morning, how many cases of each bread to bake.
+- **PO numbers and delivery days** — buyers can attach their own purchase-order
+  reference and ask for a delivery day at checkout. Both are optional. The PO
+  shows on the shipping-queue row and prints on the invoice; the requested day
+  shows as "Wants Sep 3" so you know what to pack first. The day they pick can
+  only ever be one UPS Ground can actually reach — the site works that out
+  from your noon cutoff.
+- **Invoices and statements** — every order has a printable invoice: open it
+  from the Money panel of any order in the shipping queue, then print it or
+  save it as a PDF to email. Buyers can open their own invoices and a full
+  account statement (everything still owed, aged into current / 1–30 / 31–60 /
+  61+ days) from their account on the website or in the app — so you're not
+  the one assembling statements at month end.
 - **Shipping queue** — tick orders → Create labels → Print (thermal printer)
   → Mark shipped (buyers get tracking automatically). Refund a not-yet-shipped
   order from its row.
@@ -159,6 +181,19 @@ Everything happens at `https://dallasbakery.net/admin`:
   follows them everywhere — website, app, standing weekly orders, and
   receipts. "Back to list price" removes it.
 
+- **Email list & notifications** — buyers opt in with a box on the wholesale
+  application (unchecked by default), or you add someone who asked in person.
+  Write a subject and a message, press **Send test to me** to see exactly what
+  they'll get, then send it to the list. Every message automatically carries
+  the bakery's address and a working one-click unsubscribe, which the law
+  requires — and unsubscribing never stops order confirmations, tracking, or
+  invoices. This panel also shows how many phones are set up for push alerts.
+- **Push alerts** — once the apps are installed, buyers get a notification
+  when their order is received, when it ships (with tracking), and before an
+  invoice comes due; you get one for every new order with the business, case
+  count, and amount. Buyer notifications never show a price — a lock screen is
+  read by whoever is holding the phone, and your pricing is per customer.
+
 ## Part 4 — The phone apps (do after the website works)
 
 The apps talk to the website, so the website must be live first.
@@ -177,6 +212,12 @@ The apps talk to the website, so the website must be live first.
    variables for the production profile:
    - `EXPO_PUBLIC_API_URL` = `https://dallasbakery.net`
    - `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` = your `pk_live_...` key
+
+   **For push notifications**, also run `eas init` in this folder once — it
+   records the project id the app needs to receive them. (You can skip it;
+   the app works fine and buyers still get email, they just won't get
+   notifications.) Optionally set `EXPO_ACCESS_TOKEN` as a Worker secret to
+   require a signed sender once you're in the stores.
 4. Build: `eas build --platform ios` and `eas build --platform android`.
    EAS walks you through the Apple/Google signing questions — accept the
    defaults.

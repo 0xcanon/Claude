@@ -14,8 +14,11 @@ import {
   ApiError,
   getApplications,
   getShippingSettings,
+  registerPushToken,
+  unregisterPushToken,
   updateShippingSettings,
 } from "./src/lib/api";
+import { configureForegroundBehaviour, devicePlatform, getPushToken } from "./src/lib/push";
 import { clearSession, loadSession, saveSession } from "./src/lib/secure-session";
 import { ApplicationDetailScreen } from "./src/screens/ApplicationDetailScreen";
 import { ChangePasswordScreen } from "./src/screens/ChangePasswordScreen";
@@ -34,6 +37,31 @@ export default function App() {
   const [shipping, setShipping] = useState<ShippingSettings | null>(null);
   const [shippingSaving, setShippingSaving] = useState(false);
   const [shippingError, setShippingError] = useState("");
+  // The Expo token this phone registered, so sign-out can hand it back.
+  const [pushToken, setPushToken] = useState("");
+
+  // How an alert behaves while the app is open. Set once, before any arrive.
+  useEffect(() => {
+    configureForegroundBehaviour();
+  }, []);
+
+  /**
+   * Registers this phone for new-order alerts, once signed in and past any
+   * forced password change — so the permission prompt lands when it is
+   * obvious what it is for. Every failure is silent; the owner still gets
+   * the email.
+   */
+  useEffect(() => {
+    if (!session || session.requiresPasswordChange) return;
+    let active = true;
+    void (async () => {
+      const deviceToken = await getPushToken();
+      if (!active || !deviceToken) return;
+      const registered = await registerPushToken(session.token, deviceToken, devicePlatform());
+      if (active && registered) setPushToken(deviceToken);
+    })();
+    return () => { active = false; };
+  }, [session]);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +75,10 @@ export default function App() {
   }, []);
 
   const logout = useCallback(async () => {
+    // Stop the alerts first: a phone that leaves the bakery must not keep
+    // buzzing with the day's orders.
+    await unregisterPushToken(pushToken);
+    setPushToken("");
     await clearSession();
     setSession(null);
     setApplications([]);
@@ -54,7 +86,7 @@ export default function App() {
     setApplicationError("");
     setShipping(null);
     setShippingError("");
-  }, []);
+  }, [pushToken]);
 
   const expireSession = useCallback(async () => {
     await logout();

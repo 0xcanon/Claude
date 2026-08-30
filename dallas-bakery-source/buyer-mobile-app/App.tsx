@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { BrandLockup } from "./src/components/BrandLockup";
@@ -22,15 +22,20 @@ import {
   saveSelectedLocationId,
 } from "./src/lib/secure-session";
 import { paymentSheet } from "./src/lib/payments";
+import { configureForegroundBehaviour, devicePlatform, getPushToken } from "./src/lib/push";
 import {
   CatalogError,
   getCatalogPayload,
+  getDocumentLink,
+  getInvoices,
   getOrderStatus,
   getStandingOrder,
   orderOnAccount,
   pauseStandingOrder,
+  registerPushToken,
   saveStandingOrder,
   startBuyerPayment,
+  unregisterPushToken,
   type ConfirmedOrder,
   type CreditState,
   type CutoffState,
@@ -54,10 +59,12 @@ import { WelcomeScreen } from "./src/screens/WelcomeScreen";
 import { colors, fonts } from "./src/theme";
 import type {
   BuyerAccount,
+  BuyerInvoice,
   BuyerOrder,
   BuyerSession,
   CatalogProduct,
   CartQuantityMap,
+  DeliveryWindow,
   MainTab,
   ShippingSettings,
   TrackedApplication,
@@ -115,6 +122,20 @@ export default function App() {
   const [publicError, setPublicError] = useState("");
   const [statusError, setStatusError] = useState("");
   const [catalogError, setCatalogError] = useState("");
+
+  // The buyer's paperwork on the order in progress, and the days the bakery
+  // can actually deliver on, both cleared once an order is placed.
+  const [poNumber, setPoNumber] = useState("");
+  const [requestedDeliveryDate, setRequestedDeliveryDate] = useState("");
+  const [deliveryWindow, setDeliveryWindow] = useState<DeliveryWindow | null>(null);
+
+  // Invoices and statements, and the push token this device registered.
+  const [invoices, setInvoices] = useState<BuyerInvoice[]>([]);
+  const [openBalanceCents, setOpenBalanceCents] = useState(0);
+  const [invoiceTermsLabel, setInvoiceTermsLabel] = useState("");
+  const [documentBusyId, setDocumentBusyId] = useState("");
+  const [documentError, setDocumentError] = useState("");
+  const [pushToken, setPushToken] = useState("");
   const [checkoutError, setCheckoutError] = useState("");
 
   const selectedLocation = useMemo(
@@ -153,6 +174,12 @@ export default function App() {
       setProducts(payload.products);
       setCutoff(payload.cutoff || null);
       setCredit(payload.credit || null);
+      setDeliveryWindow(payload.deliveryWindow || null);
+      // A date chosen before the cutoff passed can become unreachable; drop it
+      // rather than sending the server a date it will refuse at checkout.
+      setRequestedDeliveryDate((current) =>
+        current && !(payload.deliveryWindow?.options || []).includes(current) ? "" : current,
+      );
       // The account's real shipping price rides in on the signed-in catalog —
       // the only place the app ever learns a rate.
       if (payload.shipping) setShipping(payload.shipping);
@@ -161,6 +188,15 @@ export default function App() {
       getStandingOrder(buyerSession)
         .then((current) => setStandingOrder(current))
         .catch(() => { /* the card simply shows nothing until the next load */ });
+      // Invoices ride along too, so the account screen is never a blank
+      // panel waiting on its own request.
+      getInvoices(buyerSession)
+        .then((payload) => {
+          setInvoices(payload.invoices || []);
+          setOpenBalanceCents(payload.openBalanceCents || 0);
+          setInvoiceTermsLabel(payload.termsLabel || "");
+        })
+        .catch(() => { /* the card hides itself until the next load */ });
     } catch (caught) {
       if (caught instanceof CatalogError && (caught.status === 401 || caught.status === 403)) {
         await expireBuyerSession();
@@ -172,6 +208,32 @@ export default function App() {
       setCatalogLoading(false);
     }
   }, [expireBuyerSession]);
+
+  // How a notification behaves while the app is open. Set once, before any
+  // arrive — an alert the buyer misses because the app happened to be open is
+  // worse than a small interruption.
+  useEffect(() => {
+    configureForegroundBehaviour();
+  }, []);
+
+  /**
+   * Registers this phone for order, shipping, and invoice notifications —
+   * only once the buyer is signed in, so the permission prompt arrives when
+   * it is obvious what it is for rather than at first launch. Every failure
+   * (declined, no project id, Expo Go, offline) is silent: the buyer keeps a
+   * fully working app and still gets email.
+   */
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    void (async () => {
+      const token = await getPushToken();
+      if (!active || !token) return;
+      const registered = await registerPushToken(session, token, devicePlatform());
+      if (active && registered) setPushToken(token);
+    })();
+    return () => { active = false; };
+  }, [session]);
 
   useEffect(() => {
     let active = true;
@@ -380,7 +442,10 @@ export default function App() {
     setCheckingOut(true);
     setCheckoutError("");
     try {
-      const started = await startBuyerPayment(session, cart, selectedLocationId);
+      const started = await startBuyerPayment(session, cart, selectedLocationId, {
+        poNumber,
+        requestedDeliveryDate,
+      });
       setPayment(started);
       setPaymentError("");
       setScreen("pay");
@@ -446,8 +511,13 @@ export default function App() {
     setPlacingOnAccount(true);
     setPaymentError("");
     try {
-      const result = await orderOnAccount(session, cart, selectedLocationId);
+      const result = await orderOnAccount(session, cart, selectedLocationId, {
+        poNumber,
+        requestedDeliveryDate,
+      });
       setCart({});
+      setPoNumber("");
+      setRequestedDeliveryDate("");
       setPayment(null);
       setConfirmedOrder(result.order);
       if (result.credit) setCredit(result.credit);
@@ -490,13 +560,44 @@ export default function App() {
   }
 
   async function signOut() {
+    // The device stops receiving this business's notifications first: a phone
+    // that changes hands must not keep buzzing with someone else's orders.
+    await unregisterPushToken(pushToken);
+    setPushToken("");
     await signOutBuyer(session);
     await clearBuyerSession();
     setSession(null);
     setAccount(null);
     setProducts([]);
     setCart({});
+    setInvoices([]);
+    setOpenBalanceCents(0);
+    setPoNumber("");
+    setRequestedDeliveryDate("");
     setScreen(trackingToken ? "status" : "welcome");
+  }
+
+  /**
+   * Opens a printable invoice or the account statement in the phone's
+   * browser. The session is traded for a short-lived link server-side — a
+   * browser tab cannot carry the app's Authorization header.
+   */
+  async function openDocument(kind: "invoice" | "statement", orderId = "") {
+    if (!session) return;
+    setDocumentBusyId(orderId || "statement");
+    setDocumentError("");
+    try {
+      const url = await getDocumentLink(session, kind, orderId);
+      await Linking.openURL(url);
+    } catch (caught) {
+      if (caught instanceof CatalogError && (caught.status === 401 || caught.status === 403)) {
+        await expireBuyerSession();
+        return;
+      }
+      setDocumentError(caught instanceof Error ? caught.message : "That document could not be opened.");
+    } finally {
+      setDocumentBusyId("");
+    }
   }
 
   /**
@@ -670,6 +771,11 @@ export default function App() {
           checkoutError={checkoutError}
           checkingOut={checkingOut}
           cutoff={cutoff}
+          deliveryWindow={deliveryWindow}
+          onChangeDeliveryDate={setRequestedDeliveryDate}
+          onChangePoNumber={setPoNumber}
+          poNumber={poNumber}
+          requestedDeliveryDate={requestedDeliveryDate}
           locations={account.locations}
           onBack={() => setScreen("catalog")}
           onCheckout={() => void beginCheckout()}
@@ -766,6 +872,13 @@ export default function App() {
           standingBusy={standingBusy}
           standingOrder={standingOrder}
           userInitials={userInitials}
+          invoices={invoices}
+          openBalanceCents={openBalanceCents}
+          termsLabel={invoiceTermsLabel}
+          documentBusyId={documentBusyId}
+          documentError={documentError}
+          onOpenInvoice={(orderId) => void openDocument("invoice", orderId)}
+          onOpenStatement={() => void openDocument("statement")}
         />
       </>
     );

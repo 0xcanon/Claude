@@ -17,6 +17,8 @@
     "@expo/metro-runtime": "~57.0.14",
     "@stripe/stripe-react-native": "0.64.0",
     "expo": "~57.0.10",
+    "expo-linking": "~8.0.8",
+    "expo-notifications": "~57.0.15",
     "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",

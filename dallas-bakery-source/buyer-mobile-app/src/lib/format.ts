@@ -100,3 +100,22 @@ export function normalizeQuantity(quantity: number, minimum: number, increment: 
   if (quantity <= safeMinimum) return safeMinimum;
   return safeMinimum + Math.ceil((quantity - safeMinimum) / safeIncrement) * safeIncrement;
 }
+
+/**
+ * "Thu, Sep 12" — how a requested delivery day reads to a buyer. Formatted in
+ * UTC so a date-only string never slips a day for someone on the West Coast.
+ */
+export function formatDeliveryDate(iso: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ""))) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${iso}T12:00:00Z`));
+}
+
+/** "$282.50" from a cents amount the server sent. */
+export function formatCents(cents: number, currencyCode = "USD") {
+  return formatMoney((Number(cents) || 0) / 100, currencyCode);
+}

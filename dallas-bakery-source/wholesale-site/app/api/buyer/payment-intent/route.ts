@@ -13,7 +13,8 @@
 
 import { BuyerAuthError, requireBuyer } from "../../../buyer-auth.ts";
 import { resolveDeliveryLocation } from "../../../buyer-locations.ts";
-import { cutoffState } from "../../../order-rules.ts";
+import { deliveryWindowFor, validateRequestedDeliveryDate } from "../../../delivery-dates.ts";
+import { cutoffState, normalizePoNumber, validatePoNumber } from "../../../order-rules.ts";
 import { getWholesaleShippingSettings } from "../../../shipping-settings.ts";
 import {
   createCustomerSession,
@@ -39,12 +40,27 @@ export async function POST(request: Request) {
       return Response.json({ error: NOT_CONNECTED }, { status: 503 });
     }
 
-    let body: { lines?: CartLine[]; locationId?: string };
+    let body: {
+      lines?: CartLine[];
+      locationId?: string;
+      poNumber?: string;
+      requestedDeliveryDate?: string;
+    };
     try {
       body = await request.json();
     } catch {
       return Response.json({ error: "Invalid request." }, { status: 400 });
     }
+
+    // The buyer's own paperwork fields, checked before a card is charged: a
+    // rejected PO number after payment would mean refunding a good order.
+    const poProblem = validatePoNumber(body.poNumber);
+    if (poProblem) return Response.json({ error: poProblem }, { status: 400 });
+    const poNumber = normalizePoNumber(body.poNumber);
+
+    const requestedDeliveryDate = String(body.requestedDeliveryDate || "").trim();
+    const dateProblem = validateRequestedDeliveryDate(requestedDeliveryDate);
+    if (dateProblem) return Response.json({ error: dateProblem }, { status: 400 });
 
     const shipping = await getWholesaleShippingSettings();
     // Exclusive prices, when the owner has set any for this business.
@@ -94,6 +110,8 @@ export async function POST(request: Request) {
         city: deliverTo.city.slice(0, 100),
         state: deliverTo.state.slice(0, 10),
         zip: deliverTo.zip.slice(0, 20),
+        poNumber,
+        requestedDeliveryDate,
       },
     });
 
@@ -149,6 +167,9 @@ export async function POST(request: Request) {
           state: deliverTo.state,
           zip: deliverTo.zip,
         },
+        poNumber,
+        requestedDeliveryDate,
+        deliveryWindow: deliveryWindowFor(),
         cutoff: cutoffState(),
       },
       { headers: { "Cache-Control": "no-store" } },

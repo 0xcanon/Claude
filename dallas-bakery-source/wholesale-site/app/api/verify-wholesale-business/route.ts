@@ -11,6 +11,7 @@ import {
   newApplicationOwnerEmail,
   sendMail,
 } from "../../email-notifications";
+import { subscribe } from "../../marketing-list.ts";
 import { OUT_OF_AREA_MESSAGE, isDeliverableState } from "../../order-rules";
 import {
   clean,
@@ -496,6 +497,16 @@ export async function POST(request: Request) {
       },
       { status: 500 },
     );
+  }
+
+  // The marketing list is opt-in only: the box on the form starts unchecked,
+  // and a failure to record the opt-in must never fail the application.
+  if (payload.marketingOptIn === true) {
+    try {
+      await subscribe(email, businessName, "application");
+    } catch (caught) {
+      console.error("Marketing opt-in could not be recorded:", caught);
+    }
   }
 
   await sendMail(newApplicationOwnerEmail(

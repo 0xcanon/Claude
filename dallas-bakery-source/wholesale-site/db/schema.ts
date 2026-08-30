@@ -134,6 +134,10 @@ export const orders = sqliteTable("orders", {
   // Account orders only: when the invoice is due, stamped at order time from
   // the customer's net terms so a later terms change never moves it.
   invoiceDueAt: text("invoice_due_at"),
+  // The buyer's own purchase-order reference, for their accounts-payable team.
+  poNumber: text("po_number").notNull().default(""),
+  // The delivery date the buyer asked for (YYYY-MM-DD), when they chose one.
+  requestedDeliveryDate: text("requested_delivery_date"),
   // "paid" -> "labeled" -> "shipped"
   status: text("status").notNull().default("paid"),
   trackingNumber: text("tracking_number").notNull().default(""),
@@ -226,6 +230,20 @@ export const products = sqliteTable("products", {
   boxLengthIn: integer("box_length_in").notNull().default(24),
   boxWidthIn: integer("box_width_in").notNull().default(16),
   boxHeightIn: integer("box_height_in").notNull().default(6),
+  // Food spec, in the buyer's own words. The physical label carries these
+  // already; these fields put the same text in the catalog where a buyer can
+  // read, copy, and file it for their own allergen matrix.
+  ingredients: text("ingredients").notNull().default(""),
+  allergens: text("allergens").notNull().default(""),
+  netWeight: text("net_weight").notNull().default(""),
+  shelfLife: text("shelf_life").notNull().default(""),
+  storage: text("storage").notNull().default(""),
+  certifications: text("certifications").notNull().default(""),
+  // Stock control. inStock is the "sold out today" switch; the capacity
+  // numbers stop the oven being oversold. Zero means no limit.
+  inStock: integer("in_stock", { mode: "boolean" }).notNull().default(true),
+  dailyCapacityCases: integer("daily_capacity_cases").notNull().default(0),
+  maxCasesPerOrder: integer("max_cases_per_order").notNull().default(0),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -248,4 +266,41 @@ export const customerPrices = sqliteTable(
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [primaryKey({ columns: [table.applicationId, table.sku] })],
+);
+
+/**
+ * The marketing email list — deliberately separate from transactional mail.
+ * Nobody lands here without ticking a box, and every row carries its own
+ * unsubscribe token so any send can include a working one-click footer.
+ */
+export const marketingSubscribers = sqliteTable(
+  "marketing_subscribers",
+  {
+    email: text("email").primaryKey(),
+    businessName: text("business_name").notNull().default(""),
+    source: text("source").notNull().default("application"),
+    unsubscribeToken: text("unsubscribe_token").notNull(),
+    subscribedAt: text("subscribed_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    unsubscribedAt: text("unsubscribed_at"),
+  },
+  (table) => [index("marketing_subscribers_active_idx").on(table.unsubscribedAt)],
+);
+
+/**
+ * Expo push tokens, one row per device. `audience` separates the buyer app
+ * from the owner app; a buyer's token is scoped to the business it signed in
+ * as, so an order update only ever reaches that business's own devices.
+ */
+export const pushDevices = sqliteTable(
+  "push_devices",
+  {
+    token: text("token").primaryKey(),
+    audience: text("audience").notNull().default("buyer"),
+    applicationId: text("application_id").notNull().default(""),
+    email: text("email").notNull().default(""),
+    platform: text("platform").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    lastSeenAt: text("last_seen_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("push_devices_audience_idx").on(table.audience, table.applicationId)],
 );

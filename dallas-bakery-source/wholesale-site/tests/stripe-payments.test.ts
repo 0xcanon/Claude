@@ -16,6 +16,8 @@ function product(sku: string, loafPriceCents: number): CatalogProductRow {
     sku, handle: sku.toLowerCase(), title: `${sku} — Case of 25`, description: "",
     loafPriceCents, loavesPerCase: 25, imageUrl: "",
     boxWeightOz: 432, boxLengthIn: 24, boxWidthIn: 16, boxHeightIn: 6,
+    ingredients: "", allergens: "", netWeight: "", shelfLife: "", storage: "", certifications: "",
+    inStock: true, dailyCapacityCases: 0, maxCasesPerOrder: 0,
     active: true, sortOrder: 0,
   };
 }

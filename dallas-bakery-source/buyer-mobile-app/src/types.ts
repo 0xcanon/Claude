@@ -110,6 +110,10 @@ export type BuyerOrder = {
   invoicePaid?: boolean;
   /** Account orders: when the invoice is due (YYYY-MM-DD). */
   invoiceDueAt?: string;
+  /** The buyer's own purchase-order reference, when they gave one. */
+  poNumber?: string;
+  /** The delivery day the buyer asked for (YYYY-MM-DD), when they picked one. */
+  requestedDeliveryDate?: string;
 
   deliverTo: {
     name: string;
@@ -153,6 +157,28 @@ export type CatalogVariant = {
   unitsPerCase?: number;
 };
 
+/**
+ * The words on the physical label, carried in the catalog so a chef can read
+ * and file them without squinting at a photo of a bag.
+ */
+export type ProductSpec = {
+  ingredients: string;
+  allergens: string;
+  netWeight: string;
+  shelfLife: string;
+  storage: string;
+  certifications: string;
+};
+
+export type StockState = {
+  available: boolean;
+  /** Cases still sellable today, or null when there is no daily limit. */
+  remainingToday: number | null;
+  /** Most cases one order may take, or null when uncapped. */
+  maxPerOrder: number | null;
+  label: string;
+};
+
 export type CatalogProduct = {
   id: string;
   handle: string;
@@ -160,7 +186,33 @@ export type CatalogProduct = {
   description: string;
   imageUrl: string;
   imageAlt: string;
+  spec?: ProductSpec;
+  stock?: StockState;
   variant: CatalogVariant;
+};
+
+/** The days a buyer may request delivery for, from today's cutoff. */
+export type DeliveryWindow = {
+  shipDate: string;
+  earliest: string;
+  latest: string;
+  options: string[];
+};
+
+/** One row in the buyer's invoice list. */
+export type BuyerInvoice = {
+  orderId: string;
+  invoiceNumber: string;
+  orderNumber: number;
+  placedAt: string;
+  poNumber: string;
+  paymentTerms: string;
+  dueAt: string;
+  paidAt: string;
+  totalCents: number;
+  balanceCents: number;
+  status: "paid" | "due" | "overdue" | "card";
+  statusLabel: string;
 };
 
 export type CartQuantityMap = Record<string, number>;

@@ -2,7 +2,8 @@ import { BuyerAuthError, requireBuyer } from "../../../buyer-auth.ts";
 import { creditStateFor } from "../../../buyer-credit.ts";
 import { listApprovedLocations } from "../../../buyer-locations.ts";
 import { priceOverridesFor } from "../../../customer-pricing.ts";
-import { cutoffState, orderRules } from "../../../order-rules.ts";
+import { deliveryWindowFor } from "../../../delivery-dates.ts";
+import { cutoffState, MAX_PO_NUMBER_LENGTH, orderRules } from "../../../order-rules.ts";
 import { getWholesaleShippingSettings } from "../../../shipping-settings.ts";
 import { catalogForClients } from "../../../wholesale-catalog.ts";
 
@@ -27,6 +28,11 @@ export async function GET(request: Request) {
       },
       orderRules: orderRules(),
       cutoff: cutoffState(),
+      // The days this buyer may ask delivery for, computed from today's
+      // cutoff — so the picker can never offer a date the bread cannot
+      // reach them by.
+      deliveryWindow: deliveryWindowFor(),
+      poNumberMaxLength: MAX_PO_NUMBER_LENGTH,
       // Every approved delivery address: the screened primary plus any the
       // owner added in /admin. Checkout only ever ships to one of these.
       locations: approvedLocations.map((location) => ({

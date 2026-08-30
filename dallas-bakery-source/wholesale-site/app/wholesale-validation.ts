@@ -19,6 +19,8 @@ export type ApplicationPayload = {
   locationCount?: string;
   additionalMarkets?: string;
   privacyAgreement?: boolean;
+  /** Opt-in for wholesale news. Unchecked by default; never assumed. */
+  marketingOptIn?: boolean;
   honeypot?: string;
   elapsedMs?: number;
 };

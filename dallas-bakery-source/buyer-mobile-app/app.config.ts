@@ -69,6 +69,13 @@ export default {
       },
       edgeToEdgeEnabled: true
     },
+    // The EAS project id. expo-notifications needs it to mint a push token in
+    // a signed build; set EXPO_PUBLIC_EAS_PROJECT_ID (or run `eas init`, which
+    // writes it here) before building. Without it the app still runs — push
+    // registration simply returns nothing and the buyer gets email only.
+    extra: {
+      eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined }
+    },
     plugins: [
       [
         "expo-splash-screen",
@@ -76,6 +83,15 @@ export default {
           image: "./assets/splash-icon.png",
           resizeMode: "contain",
           backgroundColor: "#2B1A13"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          // Order confirmations, shipping, and invoice reminders. The icon is
+          // the Android status-bar glyph; iOS uses the app icon.
+          icon: "./assets/adaptive-icon.png",
+          color: "#2B1A13"
         }
       ],
       [

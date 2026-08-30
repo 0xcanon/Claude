@@ -38,6 +38,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#2B1A13"
+        }
+      ],
+      [
         "expo-secure-store",
         {
           "configureAndroidBackup": true,

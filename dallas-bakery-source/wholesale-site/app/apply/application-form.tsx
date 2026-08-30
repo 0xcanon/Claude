@@ -49,6 +49,7 @@ export default function ApplicationForm() {
       locationCount: String(form.get("locationCount") || "1"),
       additionalMarkets: String(form.get("additionalMarkets") || ""),
       privacyAgreement: form.get("privacyAgreement") === "on",
+      marketingOptIn: form.get("marketingOptIn") === "on",
       honeypot: String(form.get("companyFax") || ""),
       elapsedMs: startedAt.current ? Date.now() - startedAt.current : 0,
     };
@@ -182,6 +183,16 @@ export default function ApplicationForm() {
         <input name="privacyAgreement" type="checkbox" required />
         <span>
           I agree to the <Link href="/terms">wholesale terms</Link> and understand how Dallas Bakery handles my information in its <Link href="/privacy">privacy notice</Link>.
+        </span>
+      </label>
+
+      {/* Optional and unchecked: a marketing list you were opted into is a
+          list you resent. The two boxes above are required; this one is not. */}
+      <label className="application-check">
+        <input name="marketingOptIn" type="checkbox" />
+        <span>
+          Email me when Dallas Bakery adds a bread or changes wholesale pricing. Order
+          confirmations and invoices come either way.
         </span>
       </label>
 

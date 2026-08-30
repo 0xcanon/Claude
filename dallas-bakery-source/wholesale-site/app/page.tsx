@@ -14,6 +14,8 @@ const products = [
     image:
       "https://dallasbakery.com/cdn/shop/files/barbari-bread-box-14-197.webp?v=1682804901&width=1200",
     accent: "Best seller",
+    allergens: "Contains wheat and sesame",
+    netWeight: "14 oz (397 g) per loaf",
   },
   {
     name: "Natural Barbari",
@@ -23,6 +25,8 @@ const products = [
     image:
       "https://dallasbakery.com/cdn/shop/files/natural-box-price-expiration-date-867.webp?v=1682805151&width=1200",
     accent: "Versatile",
+    allergens: "Contains wheat. Made in a bakery that also handles sesame",
+    netWeight: "14 oz (397 g) per loaf",
   },
   {
     name: "Whole Wheat Barbari",
@@ -32,6 +36,8 @@ const products = [
     image:
       "https://dallasbakery.com/cdn/shop/files/whole-wheat-box-great-pizzas-soups-473.webp?v=1682805130&width=1200",
     accent: "Whole grain",
+    allergens: "Contains wheat. Made in a bakery that also handles sesame",
+    netWeight: "13.5 oz (383 g) per loaf",
   },
 ];
 
@@ -158,6 +164,10 @@ export default async function Home() {
                   <p className="cert-note">Kosher · Halal</p>
                 </div>
                 <p>{product.description}</p>
+                <p className="product-spec">
+                  <strong>{product.allergens}.</strong> {product.netWeight} · 14-day shelf life ·
+                  Kosher (K Pareve), Halal, Vegan. Full ingredient statements are in your account.
+                </p>
                 <Link href="/order" aria-label={`View wholesale pricing for ${product.name}`}>
                   View wholesale pricing <ArrowIcon />
                 </Link>

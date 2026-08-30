@@ -1272,3 +1272,199 @@ a.admin-tracking { display: block; color: var(--tomato); font-size: 0.72rem; }
 @media (max-width: 55rem) { .admin-product-form .span2, .admin-product-form .span3 { grid-column: span 1; } }
 .admin-dims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 .admin-product-note { font-size: 0.72rem; opacity: 0.65; }
+
+/* ---------------------------------------------------------------- v21 --
+   Product spec, stock, PO numbers, delivery dates, invoices, marketing. */
+
+/* Admin: the label-copy and stock groups inside the product editor. */
+.admin-product-group {
+  margin: 1.4rem 0 0.7rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+}
+.admin-product-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--cream);
+  border: 1px solid var(--line);
+}
+.admin-product-check input { width: 1rem; height: 1rem; margin-top: 0.15rem; flex: none; }
+.admin-product-check > span:first-child,
+.admin-product-check > span { font-size: 0.8rem !important; letter-spacing: 0 !important; text-transform: none !important; opacity: 0.85 !important; }
+.admin-product-allergens {
+  margin-top: 0.35rem !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.02em;
+  opacity: 0.75 !important;
+}
+.admin-po, .admin-requested {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.admin-order-docs { margin-top: 0.7rem; font-size: 0.78rem; }
+.admin-order-docs a { text-decoration: underline; }
+
+/* Admin: the marketing panel. */
+.admin-marketing-compose { display: grid; gap: 0.9rem; margin-bottom: 1.6rem; }
+.admin-marketing-compose label { display: grid; gap: 0.35rem; }
+.admin-marketing-compose label > span { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+.admin-marketing-compose input,
+.admin-marketing-compose textarea,
+.admin-marketing-add input {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.admin-marketing-compose textarea { line-height: 1.6; resize: vertical; }
+.admin-marketing-add {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--line);
+}
+.admin-marketing-add label { display: grid; gap: 0.35rem; flex: 1 1 14rem; }
+.admin-marketing-add label > span { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+.admin-marketing-list { margin-top: 1.4rem; overflow-x: auto; }
+.admin-marketing-list table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.admin-marketing-list th {
+  text-align: left;
+  padding: 0 0.6rem 0.5rem 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  border-bottom: 1px solid var(--line);
+}
+.admin-marketing-list td { padding: 0.55rem 0.6rem 0.55rem 0; border-bottom: 1px solid rgba(42, 27, 19, 0.08); }
+.admin-marketing-list tr.inactive td { opacity: 0.5; }
+
+/* Buyer: sold-out and low-stock states on a case card. */
+.buyer-case.sold-out { opacity: 0.72; }
+/* Sits along the top edge so it never collides with the certification tag
+   pinned to the bottom-left of the same photo. */
+.buyer-case-soldout {
+  position: absolute;
+  inset: 0 0 auto 0;
+  padding: 0.4rem 0.7rem;
+  background: rgba(42, 27, 19, 0.86);
+  color: #fffaf1;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.buyer-case-allergens { margin-top: 0.5rem; font-size: 0.72rem; opacity: 0.78; }
+.buyer-case-allergens strong { letter-spacing: 0.04em; }
+.buyer-case-stock {
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tomato);
+}
+.buyer-case-unavailable { font-size: 0.76rem; opacity: 0.72; line-height: 1.5; }
+.buyer-case-spec { margin-top: 0.8rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }
+.buyer-case-spec summary {
+  cursor: pointer;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.buyer-case-spec dl { margin: 0.8rem 0 0; display: grid; gap: 0.6rem; }
+.buyer-case-spec dl div { display: grid; gap: 0.2rem; }
+.buyer-case-spec dt { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.55; }
+.buyer-case-spec dd { margin: 0; font-size: 0.76rem; line-height: 1.55; }
+.buyer-case-spec > p { margin-top: 0.8rem; font-size: 0.68rem; opacity: 0.6; }
+
+/* Buyer: PO number and delivery-day pickers in the order summary. */
+.buyer-order-fields { display: grid; gap: 0.7rem; margin-top: 1rem; }
+.buyer-field-inline { display: grid; gap: 0.3rem; }
+.buyer-field-inline > span {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.buyer-field-inline > span em { font-style: normal; opacity: 0.65; }
+.buyer-field-inline input,
+.buyer-field-inline select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  width: 100%;
+}
+.buyer-delivery-note { display: block; margin-top: 0.5rem; font-size: 0.7rem; opacity: 0.65; line-height: 1.5; }
+
+/* Buyer: invoices and statements. */
+.buyer-invoices { margin-top: 3rem; }
+.buyer-invoices-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.buyer-invoices-head h3 { font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; }
+.buyer-invoices-head p { margin-top: 0.4rem; font-size: 0.8rem; opacity: 0.72; max-width: 46ch; line-height: 1.55; }
+.buyer-invoice-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.buyer-invoice-table th {
+  text-align: left;
+  padding: 0 0.7rem 0.5rem 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  border-bottom: 1px solid var(--line);
+}
+.buyer-invoice-table td {
+  padding: 0.65rem 0.7rem 0.65rem 0;
+  border-bottom: 1px solid rgba(42, 27, 19, 0.08);
+  font-variant-numeric: tabular-nums;
+}
+.buyer-invoice-table tr.overdue td { background: rgba(174, 62, 38, 0.06); }
+.buyer-invoice-pill {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--cream);
+  border: 1px solid var(--line);
+}
+.buyer-invoice-pill.paid, .buyer-invoice-pill.card { color: var(--sage); }
+.buyer-invoice-pill.due { color: var(--gold); }
+.buyer-invoice-pill.overdue { color: var(--tomato); border-color: rgba(174, 62, 38, 0.4); }
+@media (max-width: 40rem) {
+  .buyer-invoice-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+/* The allergen and spec line on a public product card. No price appears here
+   — a kitchen with a sesame policy needs this before it applies. */
+.product-spec {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  opacity: 0.78;
+}
+.product-spec strong { opacity: 1; }

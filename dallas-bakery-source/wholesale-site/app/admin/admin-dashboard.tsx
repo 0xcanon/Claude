@@ -2,6 +2,7 @@
 
 import { CreditTerms, ExclusivePricing } from "./customer-terms";
 import { DeliveryLocations } from "./delivery-locations";
+import { MarketingPanel } from "./marketing-panel";
 import { ProductsManager } from "./products-manager";
 import { ShippingQueue } from "./shipping-queue";
 
@@ -360,6 +361,8 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
         <ProductsManager />
 
         <ShippingQueue />
+
+        <MarketingPanel />
 
         <div className="admin-toolbar">
           <div className="admin-filters" aria-label="Filter applications">

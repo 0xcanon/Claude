@@ -7,7 +7,14 @@
  */
 
 import { apiUrl } from "./api";
-import type { BuyerSession, CartQuantityMap, CatalogProduct, ShippingSettings } from "../types";
+import type {
+  BuyerInvoice,
+  BuyerSession,
+  CartQuantityMap,
+  CatalogProduct,
+  DeliveryWindow,
+  ShippingSettings,
+} from "../types";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -46,6 +53,15 @@ export type CatalogPayload = {
   cutoff: { shipsToday: boolean; label: string };
   /** The buyer's credit position — drives the "order on account" option. */
   credit?: CreditState;
+  /** Delivery days this buyer may request, given today's cutoff. */
+  deliveryWindow?: DeliveryWindow;
+  poNumberMaxLength?: number;
+};
+
+/** The paperwork a buyer can attach to an order. Both optional. */
+export type OrderPaperwork = {
+  poNumber?: string;
+  requestedDeliveryDate?: string;
 };
 
 async function authorized<T>(path: string, session: BuyerSession, init: RequestInit = {}): Promise<T> {
@@ -132,6 +148,7 @@ export async function startBuyerPayment(
   session: BuyerSession,
   cart: CartQuantityMap,
   locationId: string,
+  paperwork: OrderPaperwork = {},
 ) {
   const lines = Object.entries(cart)
     .filter(([, cases]) => cases > 0)
@@ -141,7 +158,12 @@ export async function startBuyerPayment(
     headers: { "Content-Type": "application/json" },
     // The server resolves the id against owner-approved addresses; anything
     // unknown falls back to the screened primary storefront.
-    body: JSON.stringify({ lines, locationId }),
+    body: JSON.stringify({
+      lines,
+      locationId,
+      poNumber: paperwork.poNumber || "",
+      requestedDeliveryDate: paperwork.requestedDeliveryDate || "",
+    }),
   });
 }
 
@@ -192,6 +214,7 @@ export async function orderOnAccount(
   session: BuyerSession,
   cart: CartQuantityMap,
   locationId: string,
+  paperwork: OrderPaperwork = {},
 ) {
   const lines = Object.entries(cart)
     .filter(([, cases]) => cases > 0)
@@ -202,9 +225,82 @@ export async function orderOnAccount(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lines, locationId }),
+      body: JSON.stringify({
+        lines,
+        locationId,
+        poNumber: paperwork.poNumber || "",
+        requestedDeliveryDate: paperwork.requestedDeliveryDate || "",
+      }),
     },
   );
+}
+
+export type InvoiceListPayload = {
+  invoices: BuyerInvoice[];
+  openBalanceCents: number;
+  overdueCents: number;
+  termsLabel: string;
+};
+
+/** Everything billable on this account, newest first. */
+export async function getInvoices(session: BuyerSession) {
+  return authorized<InvoiceListPayload>("/api/buyer/documents", session);
+}
+
+/**
+ * Trades the buyer's session for a short-lived link to one printable
+ * document. The app opens that link in the phone's browser, where printing
+ * and "save as PDF" already exist — an in-app viewer would only reimplement
+ * them worse.
+ */
+export async function getDocumentLink(
+  session: BuyerSession,
+  kind: "invoice" | "statement",
+  orderId = "",
+) {
+  const result = await authorized<{ url: string; expiresAt: number }>(
+    "/api/buyer/documents",
+    session,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, orderId }),
+    },
+  );
+  return result.url;
+}
+
+/**
+ * Tells the server which device to notify for this business. Best-effort: a
+ * buyer who declines notifications, or whose registration fails, still uses
+ * the app normally.
+ */
+export async function registerPushToken(session: BuyerSession, token: string, platform: string) {
+  try {
+    await authorized<{ registered: boolean }>("/api/push/register", session, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, audience: "buyer", platform }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Sign-out: this phone stops receiving this business's notifications. */
+export async function unregisterPushToken(token: string) {
+  if (!token) return;
+  try {
+    await fetch(apiUrl("/api/push/register"), {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    // A phone that cannot reach the server on sign-out simply keeps its row
+    // until the next sign-in replaces it.
+  }
 }
 
 export type StandingOrderInfo = {

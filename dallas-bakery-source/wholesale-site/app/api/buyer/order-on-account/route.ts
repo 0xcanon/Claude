@@ -29,8 +29,11 @@ import {
   ownerNewOrderEmail,
   sendMail,
 } from "../../../email-notifications.ts";
-import { cutoffState } from "../../../order-rules.ts";
+import { validateRequestedDeliveryDate } from "../../../delivery-dates.ts";
+import { cutoffState, normalizePoNumber, validatePoNumber } from "../../../order-rules.ts";
 import { recordOrder } from "../../../orders-service.ts";
+import { orderPlacedPush, ownerNewOrderPush } from "../../../push-messages.ts";
+import { pushToBuyer, pushToOwner } from "../../../push-notifications.ts";
 import { getWholesaleShippingSettings } from "../../../shipping-settings.ts";
 import { priceCart, type CartLine } from "../../../wholesale-catalog.ts";
 
@@ -44,12 +47,25 @@ export async function POST(request: Request) {
   try {
     const buyer = await requireBuyer(request);
 
-    let body: { lines?: CartLine[]; locationId?: string };
+    let body: {
+      lines?: CartLine[];
+      locationId?: string;
+      poNumber?: string;
+      requestedDeliveryDate?: string;
+    };
     try {
       body = await request.json();
     } catch {
       return Response.json({ error: "Invalid request." }, { status: 400 });
     }
+
+    const poProblem = validatePoNumber(body.poNumber);
+    if (poProblem) return Response.json({ error: poProblem }, { status: 400 });
+    const poNumber = normalizePoNumber(body.poNumber);
+
+    const requestedDeliveryDate = String(body.requestedDeliveryDate || "").trim();
+    const dateProblem = validateRequestedDeliveryDate(requestedDeliveryDate);
+    if (dateProblem) return Response.json({ error: dateProblem }, { status: 400 });
 
     const credit = await creditStateFor(buyer.applicationId);
     const shipping = await getWholesaleShippingSettings();
@@ -97,6 +113,8 @@ export async function POST(request: Request) {
       applicationId: buyer.applicationId,
       paymentTerms: "account",
       invoiceDueAt,
+      poNumber,
+      requestedDeliveryDate,
     });
 
     // The hard guarantee: re-check the balance now that this order is in.
@@ -133,6 +151,21 @@ export async function POST(request: Request) {
     await sendMail(ownerNewOrderEmail(emailDetails));
     await sendMail(buyerOrderConfirmationEmail(emailDetails));
 
+    // Push lands before email does, on both phones.
+    await pushToBuyer(
+      buyer.applicationId,
+      orderPlacedPush({ orderNumber: result.orderNumber, caseCount: cart.caseCount, shipsToday }),
+    );
+    await pushToOwner(
+      ownerNewOrderPush({
+        orderNumber: result.orderNumber,
+        businessName: buyer.businessName,
+        caseCount: cart.caseCount,
+        totalCents: cart.totalCents,
+        paymentTerms: "account",
+      }),
+    );
+
     const [order] = await getDb().select().from(orders).where(eq(orders.id, result.id)).limit(1);
     if (!order) {
       // Should be unreachable — the insert just happened — but never leave
@@ -159,6 +192,8 @@ export async function POST(request: Request) {
         paymentTerms: "account",
         termsLabel: netTermsLabel(credit.termsDays),
         invoiceDueAt,
+        poNumber: order.poNumber,
+        requestedDeliveryDate: order.requestedDeliveryDate || "",
         deliverTo: {
           name: order.customerName,
           street: order.street,

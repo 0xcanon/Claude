@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { getDb } from "../db";
 import { orders } from "../db/schema";
+import { bakeryDayStartIso } from "./order-rules.ts";
 import { packagesForOrder, type PackableItem } from "./parcel-packing.ts";
 import { listAllProducts } from "./wholesale-catalog.ts";
 import { shippingBoxesForQuantity } from "./shipping-calculation.ts";
@@ -42,16 +43,16 @@ export type NewOrderInput = {
   paymentTerms?: "card" | "account";
   /** Account orders: when the invoice is due (from the buyer's net terms). */
   invoiceDueAt?: string;
+  /** The buyer's own purchase-order reference, for their accounts payable. */
+  poNumber?: string;
+  /** Delivery day the buyer asked for (YYYY-MM-DD). A request, not a promise. */
+  requestedDeliveryDate?: string;
 };
 
+// Central time is the bakery's day boundary; orders are grouped the way the
+// person standing at the printer thinks about them.
 function todayStartIso() {
-  const now = new Date();
-  // Central time is the bakery's day boundary; orders are grouped the way the
-  // person standing at the printer thinks about them.
-  const central = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
-  central.setHours(0, 0, 0, 0);
-  const offsetMs = now.getTime() - new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" })).getTime();
-  return new Date(central.getTime() + offsetMs).toISOString().replace("T", " ").slice(0, 19);
+  return bakeryDayStartIso();
 }
 
 /**
@@ -104,6 +105,8 @@ export async function recordOrder(input: NewOrderInput) {
     applicationId: input.applicationId || "",
     paymentTerms: input.paymentTerms || "card",
     invoiceDueAt: input.paymentTerms === "account" ? input.invoiceDueAt || null : null,
+    poNumber: (input.poNumber || "").trim(),
+    requestedDeliveryDate: input.requestedDeliveryDate || null,
     status: "paid",
   });
   return { created: true, id, orderNumber: nextNumber };

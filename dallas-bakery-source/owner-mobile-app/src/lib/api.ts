@@ -10,7 +10,7 @@ const API_URL = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/
 const REQUEST_TIMEOUT_MS = 15_000;
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   token?: string;
   body?: Record<string, unknown>;
 };
@@ -127,4 +127,35 @@ export async function updateApplication(
     },
   );
   return result.application;
+}
+
+/**
+ * Registers this phone for new-order alerts. Best-effort: a failure here must
+ * never keep the owner out of the dashboard, so callers ignore the result.
+ */
+export async function registerPushToken(token: string, deviceToken: string, platform: string) {
+  try {
+    await request<{ registered: boolean }>("/api/push/register", {
+      method: "POST",
+      token,
+      body: { token: deviceToken, audience: "owner", platform },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Sign-out: this phone stops buzzing for the bakery's orders. */
+export async function unregisterPushToken(deviceToken: string) {
+  if (!deviceToken) return;
+  try {
+    await request<{ registered: boolean }>("/api/push/register", {
+      method: "DELETE",
+      body: { token: deviceToken },
+    });
+  } catch {
+    // A phone that cannot reach the server on sign-out keeps its row until
+    // the next sign-in replaces it.
+  }
 }

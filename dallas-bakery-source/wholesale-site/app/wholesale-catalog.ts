@@ -11,6 +11,7 @@ import { asc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "../db";
 import { products } from "../db/schema";
+import { committedCasesToday, stockStateFor, type CommittedCases } from "./availability.ts";
 import {
   priceCartFromProducts,
   validateProductInput,
@@ -42,6 +43,15 @@ function toRow(row: typeof products.$inferSelect): CatalogProductRow {
     boxLengthIn: row.boxLengthIn,
     boxWidthIn: row.boxWidthIn,
     boxHeightIn: row.boxHeightIn,
+    ingredients: row.ingredients,
+    allergens: row.allergens,
+    netWeight: row.netWeight,
+    shelfLife: row.shelfLife,
+    storage: row.storage,
+    certifications: row.certifications,
+    inStock: row.inStock,
+    dailyCapacityCases: row.dailyCapacityCases,
+    maxCasesPerOrder: row.maxCasesPerOrder,
     active: row.active,
     sortOrder: row.sortOrder,
   };
@@ -66,13 +76,18 @@ export async function getProduct(sku: string): Promise<CatalogProductRow | null>
 /**
  * Prices a cart against the live catalog. The price authority for checkout.
  * `overrides` carries a buyer's exclusive prices when they have any.
+ *
+ * Today's committed cases are loaded here rather than passed in, so every
+ * caller — checkout, order intake, standing orders — gets the same capacity
+ * check without having to remember to ask for it.
  */
 export async function priceCart(
   lines: CartLine[],
   shipping: { rateCents: number },
   overrides?: PriceOverrides,
 ): Promise<PricedCart> {
-  return priceCartFromProducts(await listActiveProducts(), lines, shipping, overrides);
+  const [rows, committed] = await Promise.all([listActiveProducts(), committedCasesToday()]);
+  return priceCartFromProducts(rows, lines, shipping, overrides, committed);
 }
 
 /**
@@ -81,14 +96,20 @@ export async function priceCart(
  * simply THE price. Nothing in the payload signals that other businesses pay
  * differently: most buyers have their own pricing, and each one's catalog
  * should read as the ordinary catalog.
+ *
+ * The spec block (ingredients, allergens, weight, shelf life, storage,
+ * certifications) travels with every product: a wholesale buyer needs those
+ * words to satisfy their own food-safety file, and reading them off a photo
+ * of a label is not good enough.
  */
 export async function catalogForClients(currencyCode = "USD", overrides?: PriceOverrides) {
-  const rows = await listActiveProducts();
+  const [rows, committed] = await Promise.all([listActiveProducts(), committedCasesToday()]);
   return rows.map((product) => {
     const override = overrides?.[product.sku];
     const loafPriceCents = Number.isInteger(override) && (override as number) > 0
       ? (override as number)
       : product.loafPriceCents;
+    const stock = stockStateFor(product, committed[product.sku] || 0);
     return {
       id: product.sku,
       handle: product.handle,
@@ -96,20 +117,41 @@ export async function catalogForClients(currencyCode = "USD", overrides?: PriceO
       description: product.description,
       imageUrl: product.imageUrl,
       imageAlt: product.title,
+      spec: {
+        ingredients: product.ingredients,
+        allergens: product.allergens,
+        netWeight: product.netWeight,
+        shelfLife: product.shelfLife,
+        storage: product.storage,
+        certifications: product.certifications,
+      },
+      stock,
       variant: {
         id: product.sku,
         title: `Case of ${product.loavesPerCase}`,
-        availableForSale: true,
+        availableForSale: stock.available,
         price: {
           amount: ((loafPriceCents * product.loavesPerCase) / 100).toFixed(2),
           currencyCode,
         },
-        quantityRule: { minimum: MINIMUM_CASES, maximum: null, increment: 1 },
+        quantityRule: { minimum: MINIMUM_CASES, maximum: stock.maxPerOrder, increment: 1 },
         unitsPerCase: product.loavesPerCase,
       },
     };
   });
 }
+
+/** Today's remaining capacity per SKU, for the admin's stock screen. */
+export async function catalogWithStock() {
+  const [rows, committed] = await Promise.all([listAllProducts(), committedCasesToday()]);
+  return rows.map((product) => ({
+    ...product,
+    committedToday: committed[product.sku] || 0,
+    stock: stockStateFor(product, committed[product.sku] || 0),
+  }));
+}
+
+export type { CommittedCases };
 
 export type ProductInput = {
   sku: string;
@@ -123,6 +165,15 @@ export type ProductInput = {
   boxLengthIn: number;
   boxWidthIn: number;
   boxHeightIn: number;
+  ingredients: string;
+  allergens: string;
+  netWeight: string;
+  shelfLife: string;
+  storage: string;
+  certifications: string;
+  inStock: boolean;
+  dailyCapacityCases: number;
+  maxCasesPerOrder: number;
   sortOrder: number;
 };
 
@@ -166,6 +217,18 @@ export async function setProductActive(sku: string, active: boolean) {
   await getDb()
     .update(products)
     .set({ active, updatedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(products.sku, sku));
+}
+
+/**
+ * The one-click "we ran out" switch. Different from deactivating: the bread
+ * stays in the catalog, visibly sold out, and comes back with one more click
+ * tomorrow morning.
+ */
+export async function setProductInStock(sku: string, inStock: boolean) {
+  await getDb()
+    .update(products)
+    .set({ inStock, updatedAt: sql`CURRENT_TIMESTAMP` })
     .where(eq(products.sku, sku));
 }
 

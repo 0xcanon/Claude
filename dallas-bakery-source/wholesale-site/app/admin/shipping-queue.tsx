@@ -27,6 +27,10 @@ type ShippingOrder = {
   paymentTerms: "card" | "account";
   invoicePaidAt: string | null;
   invoiceDueAt: string | null;
+  /** The buyer's own PO reference, when their accounts payable needs one. */
+  poNumber: string;
+  /** The delivery day the buyer asked for, when they picked one. */
+  requestedDeliveryDate: string | null;
   trackingNumber: string;
   trackingUrl: string;
   labelError: string;
@@ -391,6 +395,10 @@ export function ShippingQueue() {
                 <td data-label="Order">
                   <strong>#{order.orderNumber}</strong>
                   <small className={`admin-channel channel-${order.channel}`}>{order.channel}</small>
+                  {order.poNumber && <small className="admin-po">PO {order.poNumber}</small>}
+                  {order.requestedDeliveryDate && (
+                    <small className="admin-requested">Wants {order.requestedDeliveryDate}</small>
+                  )}
                 </td>
                 <td data-label="Customer">
                   {order.customerName || "—"}
@@ -461,6 +469,11 @@ export function ShippingQueue() {
                           <span>Subtotal</span><span>{money(order.subtotalCents)}</span>
                           <span>Shipping · {order.boxCount} box{order.boxCount === 1 ? "" : "es"}</span><span>{money(order.shippingCents)}</span>
                           <strong>{order.paymentTerms === "account" ? (order.invoicePaidAt ? "Invoiced · paid" : order.invoiceDueAt ? `To invoice · due ${order.invoiceDueAt}` : "To invoice") : "Charged"}</strong><strong>{money(order.totalCents)}</strong>
+                        </p>
+                        <p className="admin-order-docs">
+                          <a href={`/api/admin/documents?kind=invoice&id=${encodeURIComponent(order.id)}`} target="_blank" rel="noreferrer">
+                            Open invoice
+                          </a>
                         </p>
                         {order.paymentTerms === "account" && !order.invoicePaidAt && order.status !== "refunded" && (
                           <button

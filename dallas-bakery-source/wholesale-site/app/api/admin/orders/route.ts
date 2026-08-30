@@ -12,6 +12,8 @@ import {
   weeklySummary,
 } from "../../../orders-service.ts";
 import { ordersToCsv } from "../../../orders-csv.ts";
+import { orderShippedPush } from "../../../push-messages.ts";
+import { pushToBuyer } from "../../../push-notifications.ts";
 import { createRefund } from "../../../stripe.ts";
 import { trackingUrl } from "../../../order-status.ts";
 import { mergeZplLabels, upsConfigured, upsIsProduction } from "../../../ups-shipping.ts";
@@ -92,6 +94,11 @@ export async function GET(request: Request) {
           paymentTerms: order.paymentTerms === "account" ? "account" : "card",
           invoicePaidAt: order.invoicePaidAt,
           invoiceDueAt: order.invoiceDueAt,
+          // The buyer's paperwork: their PO reference goes on the packing
+          // slip, and the date they asked for tells the bench what to pack
+          // first when a day's orders exceed a truck.
+          poNumber: order.poNumber,
+          requestedDeliveryDate: order.requestedDeliveryDate,
           trackingNumber: order.trackingNumber,
           trackingUrl: trackingUrl(order.trackingNumber),
           labelError: order.labelError,
@@ -168,6 +175,14 @@ export async function POST(request: Request) {
     // Tracking emails are the promise the site already makes to buyers; this
     // is the moment it is kept. A mail failure must not un-ship the order.
     for (const order of shipped) {
+      // The push goes out whether or not mail is configured — it is the
+      // faster signal, and the buyer app is where tracking gets tapped.
+      if (order.applicationId) {
+        await pushToBuyer(
+          order.applicationId,
+          orderShippedPush({ orderNumber: order.orderNumber, trackingNumber: order.trackingNumber }),
+        );
+      }
       if (!order.email || !order.trackingNumber || order.trackingEmailSentAt) continue;
       const sent = await sendMail(trackingEmail(order));
       if (sent) await markTrackingEmailed(order.id);

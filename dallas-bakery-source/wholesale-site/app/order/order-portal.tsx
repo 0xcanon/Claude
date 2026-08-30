@@ -5,18 +5,60 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckoutForm, type CheckoutSummary, type DeliverTo } from "./checkout-form";
 import { OrderConfirmation, type ConfirmedOrder } from "./order-confirmation";
 
+type ProductSpec = {
+  ingredients: string;
+  allergens: string;
+  netWeight: string;
+  shelfLife: string;
+  storage: string;
+  certifications: string;
+};
+
+type StockState = {
+  available: boolean;
+  remainingToday: number | null;
+  maxPerOrder: number | null;
+  label: string;
+};
+
 type Product = {
   id: string;
   handle: string;
   title: string;
   description: string;
   imageUrl: string;
+  spec?: ProductSpec;
+  stock?: StockState;
   variant: {
     id: string;
     title: string;
     price: { amount: string; currencyCode: string };
     unitsPerCase?: number;
+    availableForSale?: boolean;
+    quantityRule?: { minimum: number; maximum: number | null; increment: number };
   };
+};
+
+type DeliveryWindow = {
+  shipDate: string;
+  earliest: string;
+  latest: string;
+  options: string[];
+};
+
+type Invoice = {
+  orderId: string;
+  invoiceNumber: string;
+  orderNumber: number;
+  placedAt: string;
+  poNumber: string;
+  paymentTerms: string;
+  dueAt: string;
+  paidAt: string;
+  totalCents: number;
+  balanceCents: number;
+  status: "paid" | "due" | "overdue" | "card";
+  statusLabel: string;
 };
 
 type Credit = {
@@ -83,6 +125,17 @@ function orderDate(value: string) {
     : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** "Thu, Sep 12" — the same wording the server uses on the order. */
+function deliveryDate(iso: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ""))) return "";
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 const TRACK_STEPS = ["Baking", "Packed", "Shipped"] as const;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -126,6 +179,17 @@ export function OrderPortal() {
   const [standingWeekday, setStandingWeekday] = useState(2);
   const [standingBusy, setStandingBusy] = useState(false);
   const [standingNotice, setStandingNotice] = useState("");
+
+  // The buyer's own paperwork on this order: their PO reference, and the day
+  // they'd like it to arrive. Both optional — most orders carry neither.
+  const [poNumber, setPoNumber] = useState("");
+  const [requestedDeliveryDate, setRequestedDeliveryDate] = useState("");
+  const [deliveryWindow, setDeliveryWindow] = useState<DeliveryWindow | null>(null);
+
+  // Invoices and statements, for the buyer's bookkeeper.
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [openBalanceCents, setOpenBalanceCents] = useState(0);
+  const [documentBusy, setDocumentBusy] = useState("");
 
   // Card step. The client secret can only confirm the one payment the server
   // priced, so nothing here can change what is charged.
@@ -173,10 +237,11 @@ export function OrderPortal() {
     setError("");
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [catalogResponse, ordersResponse, standingResponse] = await Promise.all([
+      const [catalogResponse, ordersResponse, standingResponse, documentsResponse] = await Promise.all([
         fetch("/api/buyer/catalog", { headers, cache: "no-store" }),
         fetch("/api/buyer/orders", { headers, cache: "no-store" }),
         fetch("/api/buyer/standing-order", { headers, cache: "no-store" }),
+        fetch("/api/buyer/documents", { headers, cache: "no-store" }),
       ]);
       if (catalogResponse.status === 401 || catalogResponse.status === 403) {
         signOut();
@@ -195,6 +260,12 @@ export function OrderPortal() {
       setRules(catalog.orderRules || null);
       setCutoff(catalog.cutoff || null);
       setCredit(catalog.credit || null);
+      setDeliveryWindow(catalog.deliveryWindow || null);
+      // A date chosen before the cutoff passed can become unreachable; drop it
+      // rather than sending the server a date it will reject at checkout.
+      setRequestedDeliveryDate((current) =>
+        current && !(catalog.deliveryWindow?.options || []).includes(current) ? "" : current,
+      );
       if (catalog.shipping) setShipping(catalog.shipping);
       if (ordersResponse.ok) {
         const data = await ordersResponse.json();
@@ -203,6 +274,11 @@ export function OrderPortal() {
       if (standingResponse.ok) {
         const data = await standingResponse.json();
         setStandingOrder(data.standingOrder || null);
+      }
+      if (documentsResponse.ok) {
+        const data = await documentsResponse.json();
+        setInvoices(data.invoices || []);
+        setOpenBalanceCents(Number(data.openBalanceCents || 0));
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The catalog could not be loaded.");
@@ -290,6 +366,8 @@ export function OrderPortal() {
         body: JSON.stringify({
           lines: Object.entries(cart).map(([sku, cases]) => ({ sku, cases })),
           locationId,
+          poNumber,
+          requestedDeliveryDate,
         }),
       });
       const data = await response.json();
@@ -332,6 +410,8 @@ export function OrderPortal() {
         body: JSON.stringify({
           lines: Object.entries(cart).map(([sku, cases]) => ({ sku, cases })),
           locationId,
+          poNumber,
+          requestedDeliveryDate,
         }),
       });
       const data = await response.json();
@@ -346,6 +426,8 @@ export function OrderPortal() {
       setAccountOrder(data.order as ConfirmedOrder);
       if (data.credit) setCredit(data.credit as Credit);
       setCart({});
+      setPoNumber("");
+      setRequestedDeliveryDate("");
       setStep("paid");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The order could not be placed on account.");
@@ -411,10 +493,41 @@ export function OrderPortal() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  /**
+   * Opens an invoice or the account statement in a new tab.
+   *
+   * The tab is opened first, synchronously, and pointed at the document once
+   * the signed link comes back — a browser blocks a window opened after an
+   * await, which would silently do nothing when a buyer clicks "Invoice".
+   */
+  async function openDocument(kind: "invoice" | "statement", orderId = "") {
+    if (!session) return;
+    const tab = window.open("", "_blank", "noopener");
+    setDocumentBusy(orderId || "statement");
+    try {
+      const response = await fetch("/api/buyer/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+        body: JSON.stringify({ kind, orderId }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.url) throw new Error(data.error || "That document could not be opened.");
+      if (tab) tab.location.href = data.url;
+      else window.location.href = data.url;
+    } catch (caught) {
+      tab?.close();
+      setError(caught instanceof Error ? caught.message : "That document could not be opened.");
+    } finally {
+      setDocumentBusy("");
+    }
+  }
+
   function paymentSucceeded(paymentIntentId: string) {
     setPaidIntentId(paymentIntentId);
     setPayment(null);
     setCart({});
+    setPoNumber("");
+    setRequestedDeliveryDate("");
     setStep("paid");
   }
 
@@ -564,31 +677,88 @@ export function OrderPortal() {
             const cases = cart[product.id] || 0;
             const priceCents = Math.round(Number(product.variant.price.amount) * 100);
             const perCase = product.variant.unitsPerCase || 25;
+            const stock = product.stock;
+            const soldOut = stock ? !stock.available : false;
+            // The most this order may take: whichever of the per-order cap and
+            // today's remaining capacity is tighter.
+            const ceiling = stock?.maxPerOrder ?? 200;
+            const spec = product.spec;
+            const hasSpec = Boolean(
+              spec && (spec.ingredients || spec.allergens || spec.netWeight || spec.certifications),
+            );
             return (
-              <article key={product.id} className={cases ? "buyer-case in-cart" : "buyer-case"}>
+              <article
+                key={product.id}
+                className={`buyer-case${cases ? " in-cart" : ""}${soldOut ? " sold-out" : ""}`}
+              >
                 {product.imageUrl && (
                   <div className="buyer-case-image">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={product.imageUrl} alt="" loading="lazy" />
-                    <span className="buyer-case-tag">KOSHER · HALAL</span>
+                    <span className="buyer-case-tag">
+                      {spec?.certifications ? spec.certifications.toUpperCase() : "KOSHER · HALAL"}
+                    </span>
+                    {soldOut && <span className="buyer-case-soldout">{stock?.label || "Sold out"}</span>}
                   </div>
                 )}
                 <div className="buyer-case-body">
                   <h3>{product.title}</h3>
                   <p>{product.description}</p>
+                  {spec?.allergens && (
+                    <p className="buyer-case-allergens">
+                      <strong>Contains:</strong> {spec.allergens}
+                    </p>
+                  )}
                   <p className="buyer-case-price">
                     <strong>{money(priceCents)}</strong>
                     <span>per case</span>
-                    <small>{perCase} loaves · {money(Math.round(priceCents / perCase))} a loaf</small>
+                    <small>
+                      {perCase} loaves · {money(Math.round(priceCents / perCase))} a loaf
+                      {spec?.netWeight ? ` · ${spec.netWeight} each` : ""}
+                    </small>
                   </p>
+                  {stock && !soldOut && stock.label !== "In stock" && (
+                    <p className="buyer-case-stock">{stock.label}</p>
+                  )}
+                  {hasSpec && spec && (
+                    <details className="buyer-case-spec">
+                      <summary>Ingredients &amp; product spec</summary>
+                      <dl>
+                        {spec.ingredients && (
+                          <div><dt>Ingredients</dt><dd>{spec.ingredients}</dd></div>
+                        )}
+                        {spec.allergens && <div><dt>Contains</dt><dd>{spec.allergens}</dd></div>}
+                        {spec.netWeight && <div><dt>Net weight</dt><dd>{spec.netWeight} per loaf</dd></div>}
+                        {spec.shelfLife && <div><dt>Shelf life</dt><dd>{spec.shelfLife}</dd></div>}
+                        {spec.storage && <div><dt>Storage</dt><dd>{spec.storage}</dd></div>}
+                        {spec.certifications && <div><dt>Certifications</dt><dd>{spec.certifications}</dd></div>}
+                      </dl>
+                      <p>Copy this into your allergen file — it matches the printed bag word for word.</p>
+                    </details>
+                  )}
                   <div className="buyer-case-actions">
-                    <div className="buyer-stepper">
-                      <button type="button" onClick={() => setCases(product.id, cases - 1)} aria-label={`One fewer case of ${product.title}`}>−</button>
-                      <span aria-live="polite">{cases}</span>
-                      <button type="button" onClick={() => setCases(product.id, cases + 1)} aria-label={`One more case of ${product.title}`}>+</button>
-                    </div>
-                    {cases > 0 && (
-                      <span className="buyer-case-line">{cases * perCase} loaves · {money(priceCents * cases)}</span>
+                    {soldOut ? (
+                      <p className="buyer-case-unavailable">
+                        {stock?.label || "Sold out"} — call {"(469) 729-4706"} if you need it today.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="buyer-stepper">
+                          <button type="button" onClick={() => setCases(product.id, cases - 1)} aria-label={`One fewer case of ${product.title}`}>−</button>
+                          <span aria-live="polite">{cases}</span>
+                          <button
+                            type="button"
+                            disabled={cases >= ceiling}
+                            onClick={() => setCases(product.id, Math.min(ceiling, cases + 1))}
+                            aria-label={`One more case of ${product.title}`}
+                          >
+                            +
+                          </button>
+                        </div>
+                        {cases > 0 && (
+                          <span className="buyer-case-line">{cases * perCase} loaves · {money(priceCents * cases)}</span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -623,6 +793,44 @@ export function OrderPortal() {
             One case ships as one box at {money(shipping.rateCents)}. No sales tax on bakery items.
             {rules ? ` ${rules.minimumLabel} minimum. Delivery in ${rules.leadTimeLabel}.` : ""}
           </small>
+
+          {/* Both optional. A buyer whose accounts payable needs a PO puts it
+              here so it lands on the invoice and the packing slip. */}
+          <div className="buyer-order-fields">
+            <label className="buyer-field-inline">
+              <span>PO number <em>optional</em></span>
+              <input
+                value={poNumber}
+                maxLength={40}
+                onChange={(event) => setPoNumber(event.target.value)}
+                placeholder="Your reference"
+              />
+            </label>
+            {deliveryWindow && deliveryWindow.options.length > 0 && (
+              <label className="buyer-field-inline">
+                <span>Delivery day <em>optional</em></span>
+                <select
+                  value={requestedDeliveryDate}
+                  onChange={(event) => setRequestedDeliveryDate(event.target.value)}
+                >
+                  <option value="">As soon as it arrives</option>
+                  {deliveryWindow.options.map((option) => (
+                    <option key={option} value={option}>
+                      {deliveryDate(option)}
+                      {option === deliveryWindow.earliest ? " — earliest" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          {deliveryWindow && (
+            <small className="buyer-delivery-note">
+              {requestedDeliveryDate
+                ? `We'll aim for ${deliveryDate(requestedDeliveryDate)}. UPS Ground dates are a request, not a guarantee.`
+                : `Shipping ${deliveryDate(deliveryWindow.shipDate)}, most orders landing ${deliveryDate(deliveryWindow.earliest)}–${deliveryDate(deliveryWindow.latest)}.`}
+            </small>
+          )}
           {credit?.enabled && credit.overdueCents === 0 && caseCount > 0 && subtotalCents + shippingCents <= credit.availableCents ? (
             /* A buyer with credit defaults to their account — no card asked
                for. Card stays one click away for whoever prefers it. */
@@ -702,6 +910,55 @@ export function OrderPortal() {
           </div>
         </aside>
       </div>
+
+      {invoices.length > 0 && (
+        <section className="buyer-invoices">
+          <div className="buyer-invoices-head">
+            <div>
+              <h3>Invoices &amp; statements</h3>
+              <p>
+                {openBalanceCents > 0
+                  ? <>Your open balance is <strong>{money(openBalanceCents)}</strong>. Each invoice opens ready to print or save as a PDF.</>
+                  : "Every invoice opens ready to print or save as a PDF. Nothing is currently outstanding."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="buyer-link"
+              disabled={documentBusy !== ""}
+              onClick={() => void openDocument("statement")}
+            >
+              {documentBusy === "statement" ? "Opening…" : "Open account statement"}
+            </button>
+          </div>
+          <table className="buyer-invoice-table">
+            <thead>
+              <tr><th>Invoice</th><th>Date</th><th>PO</th><th>Status</th><th>Amount</th><th /></tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.orderId} className={invoice.status === "overdue" ? "overdue" : ""}>
+                  <td>{invoice.invoiceNumber}</td>
+                  <td>{orderDate(invoice.placedAt)}</td>
+                  <td>{invoice.poNumber || "—"}</td>
+                  <td><span className={`buyer-invoice-pill ${invoice.status}`}>{invoice.statusLabel}</span></td>
+                  <td>{money(invoice.totalCents)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="buyer-link"
+                      disabled={documentBusy !== ""}
+                      onClick={() => void openDocument("invoice", invoice.orderId)}
+                    >
+                      {documentBusy === invoice.orderId ? "Opening…" : "Open"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {orders.length > 0 && (
         <section className="buyer-orders">

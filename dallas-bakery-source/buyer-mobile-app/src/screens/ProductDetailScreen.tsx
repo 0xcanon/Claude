@@ -29,6 +29,19 @@ export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQu
   const currency = product.variant.price.currencyCode;
   const perCase = loavesPerCase(product);
   const subtotal = Number(product.variant.price.amount) * quantity;
+  const stock = product.stock;
+  const soldOut = stock ? !stock.available : false;
+  const spec = product.spec;
+  const specRows: [string, string][] = spec
+    ? ([
+        ["INGREDIENTS", spec.ingredients],
+        ["CONTAINS", spec.allergens],
+        ["NET WEIGHT", spec.netWeight ? `${spec.netWeight} per loaf` : ""],
+        ["SHELF LIFE", spec.shelfLife],
+        ["STORAGE", spec.storage],
+        ["CERTIFICATIONS", spec.certifications],
+      ] as [string, string][]).filter(([, value]) => Boolean(value))
+    : [];
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -38,7 +51,7 @@ export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQu
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Image source={product.imageUrl ? { uri: product.imageUrl } : fallbackImage} style={styles.image} />
-        <Text style={styles.tag}>KOSHER · HALAL</Text>
+        <Text style={styles.tag}>{spec?.certifications ? spec.certifications.toUpperCase() : "KOSHER · HALAL"}</Text>
         <Text style={styles.title}>{product.title}</Text>
         <Text style={styles.description}>{product.description || "Traditional Persian Barbari flatbread with a 14-day shelf life."}</Text>
         <View style={styles.priceRow}>
@@ -47,7 +60,17 @@ export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQu
         </View>
         <Text style={styles.caseBreakdown}>
           One case is {loafLabel(perCase)} — {formatMoney(loafPrice(product), currency)} a loaf.
+          {spec?.netWeight ? ` Each loaf is ${spec.netWeight}.` : ""}
         </Text>
+        {!!spec?.allergens && <Text style={styles.allergens}>Contains: {spec.allergens}</Text>}
+        {!!stock && !soldOut && stock.label !== "In stock" && (
+          <Text style={styles.stock}>{stock.label.toUpperCase()}</Text>
+        )}
+        {soldOut && (
+          <Text style={styles.soldOut}>
+            {(stock?.label || "Sold out").toUpperCase()} — call (469) 729-4706 if you need it today.
+          </Text>
+        )}
 
         <View style={styles.divider} />
         <View style={styles.controls}>
@@ -75,8 +98,27 @@ export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQu
           <Text style={styles.deliveryText}>{location?.companyName || "Location setup is still underway."}</Text>
         </View>
 
+        {specRows.length > 0 && (
+          <View style={styles.spec}>
+            <Text style={styles.specKicker}>PRODUCT SPECIFICATION</Text>
+            {specRows.map(([label, value]) => (
+              <View key={label} style={styles.specRow}>
+                <Text style={styles.specLabel}>{label}</Text>
+                <Text style={styles.specValue}>{value}</Text>
+              </View>
+            ))}
+            <Text style={styles.specNote}>
+              This matches the printed bag word for word — copy it straight into your allergen file.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.subtotalRow}><Text style={styles.subtotalLabel}>ORDER SUBTOTAL</Text><Text style={styles.subtotal}>{formatMoney(subtotal, currency)}</Text></View>
-        <PrimaryButton label={`${initialQuantity ? "UPDATE" : "ADD"} ${caseLabel(quantity).toUpperCase()}`} onPress={() => { onSetQuantity(quantity); onBack(); }} />
+        <PrimaryButton
+          disabled={soldOut}
+          label={soldOut ? "SOLD OUT" : `${initialQuantity ? "UPDATE" : "ADD"} ${caseLabel(quantity).toUpperCase()}`}
+          onPress={() => { onSetQuantity(quantity); onBack(); }}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -96,6 +138,15 @@ const styles = StyleSheet.create({
   price: { color: colors.rust, fontFamily: fonts.serif, fontWeight: "700", fontSize: 27 },
   unit: { color: colors.muted, fontFamily: fonts.sans, fontSize: 9 },
   caseBreakdown: { marginTop: 6, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, lineHeight: 16 },
+  allergens: { marginTop: 8, color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 9.5, lineHeight: 15 },
+  stock: { marginTop: 8, color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 7.5, letterSpacing: 0.8 },
+  soldOut: { marginTop: 8, padding: 10, color: colors.danger, backgroundColor: colors.rosePale, fontFamily: fonts.sansMedium, fontSize: 8.5, lineHeight: 14 },
+  spec: { marginTop: 18, padding: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
+  specKicker: { marginBottom: 10, color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 7, letterSpacing: 1 },
+  specRow: { paddingVertical: 7, borderTopWidth: 1, borderTopColor: colors.line },
+  specLabel: { color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 6.5, letterSpacing: 0.8 },
+  specValue: { marginTop: 4, color: colors.chocolate, fontFamily: fonts.sans, fontSize: 9.5, lineHeight: 15 },
+  specNote: { marginTop: 11, color: colors.muted, fontFamily: fonts.sans, fontSize: 8, lineHeight: 13 },
   divider: { height: 1, marginVertical: 18, backgroundColor: colors.line },
   controls: { flexDirection: "row", gap: 10 },
   controlBlock: { flex: 1 },
