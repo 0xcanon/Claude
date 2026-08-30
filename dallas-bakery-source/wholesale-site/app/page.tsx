@@ -110,8 +110,8 @@ export default async function Home() {
         <div className="hero-visual">
           <div className="hero-image-wrap">
             <Image
-              src="/images/classic-barbari.webp"
-              alt="Golden Persian Barbari bread from Dallas Bakery"
+              src="/images/hero-barbari.webp"
+              alt="A golden Persian Barbari loaf from Dallas Bakery"
               fill
               priority
               unoptimized
@@ -201,8 +201,8 @@ export default async function Home() {
       <section className="use-section">
         <div className="use-image">
           <Image
-            src="/images/sesame-barbari.webp"
-            alt="Sesame Barbari bread ready for foodservice"
+            src="/images/foodservice-basket.webp"
+            alt="Warm sesame Barbari served from a cloth-lined basket at a Dallas Bakery table"
             fill
             unoptimized
             sizes="(max-width: 900px) 100vw, 50vw"

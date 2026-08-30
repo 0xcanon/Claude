@@ -15,6 +15,7 @@ import { committedCasesToday, stockStateFor, type CommittedCases } from "./avail
 import {
   priceCartFromProducts,
   validateProductInput,
+  absoluteImageUrl,
   type CartLine,
   type CatalogProductRow,
   type PriceOverrides,
@@ -115,7 +116,7 @@ export async function catalogForClients(currencyCode = "USD", overrides?: PriceO
       handle: product.handle,
       title: product.title,
       description: product.description,
-      imageUrl: product.imageUrl,
+      imageUrl: absoluteImageUrl(product.imageUrl),
       imageAlt: product.title,
       spec: {
         ingredients: product.ingredients,

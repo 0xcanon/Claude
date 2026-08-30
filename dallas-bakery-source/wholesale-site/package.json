@@ -20,7 +20,7 @@
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc",
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.deploy.jsonc",
-    "deploy": "npm run build && wrangler deploy --config wrangler.deploy.jsonc"
+    "deploy": "npm test && wrangler deploy --config wrangler.deploy.jsonc"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^5.0.0",

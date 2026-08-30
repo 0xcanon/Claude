@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { validateImageUrl } from "../app/catalog-pricing.ts";
+import { absoluteImageUrl, validateImageUrl } from "../app/catalog-pricing.ts";
 
 /**
  * Nothing this site renders may be fetched from someone else's server.
@@ -139,8 +139,19 @@ test("a path on this site is accepted", () => {
   assert.equal(validateImageUrl(undefined), null);
 });
 
-test("a path that is neither absolute nor rooted is refused", () => {
-  assert.match(validateImageUrl("images/case.jpg") || "", /start with a slash/);
-  assert.match(validateImageUrl("../../etc/passwd") || "", /start with a slash/);
-  assert.ok(validateImageUrl("/images/../../secret.png"));
+test("a photo outside /images/ is refused", () => {
+  // Narrow on purpose: /images/ is the one directory that ships with the site,
+  // so anything else is either a typo or an attempt to reach somewhere else.
+  assert.match(validateImageUrl("images/case.jpg") || "", /live in \/images\//);
+  assert.match(validateImageUrl("../../etc/passwd") || "", /live in \/images\//);
+  assert.match(validateImageUrl("/uploads/case.jpg") || "", /live in \/images\//);
+  assert.ok(validateImageUrl("/images/../../secret.png"), "traversal must be refused");
+});
+
+test("what the apps are sent is loadable without a page to resolve against", () => {
+  // The stored path is relative; what leaves the API must not be, or React
+  // Native gets a URI with no host and renders nothing.
+  assert.match(absoluteImageUrl("/images/case.jpg"), /^https?:\/\/[^/]+\/images\/case\.jpg$/);
+  assert.equal(absoluteImageUrl("https://cdn.example.com/x.webp"), "https://cdn.example.com/x.webp");
+  assert.equal(absoluteImageUrl(""), "");
 });

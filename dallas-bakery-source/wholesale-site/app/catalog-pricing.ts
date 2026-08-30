@@ -1,3 +1,5 @@
+import { siteUrl } from "./buyer-portal.ts";
+
 /**
  * Case pricing — the pure half of the catalog, and still the price authority.
  *
@@ -297,8 +299,8 @@ export function validateImageUrl(imageUrl: string | undefined): string | null {
   if (/^https?:\/\//i.test(value)) {
     return "Use a photo stored on this site, like /images/barbari.webp. A link to another company's server stops working the day they change it.";
   }
-  if (!value.startsWith("/")) {
-    return "The photo path has to start with a slash, like /images/barbari.webp.";
+  if (!value.startsWith("/images/")) {
+    return "Product photos live in /images/. Use a path like /images/barbari.webp.";
   }
   if (value.includes("..")) {
     return "That photo path is not valid.";
@@ -358,4 +360,23 @@ export function validateProductInput(input: {
     }
   }
   return null;
+}
+
+/**
+ * Makes a product photo loadable by every client, not just the website.
+ *
+ * Photos are stored as site-relative paths ("/images/case.jpg") because that
+ * is what keeps them on our own server and survives a domain change. A browser
+ * resolves that against the page it is on. The apps have no page, so React
+ * Native's <Image> was handed a URI with no host and quietly rendered nothing
+ * — every product card in the buyer app was blank.
+ *
+ * Absolutising here rather than in the apps means the phones already installed
+ * start showing photos the moment this deploys, with no app-store release.
+ */
+export function absoluteImageUrl(imageUrl: string) {
+  const value = String(imageUrl || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${siteUrl()}${value.startsWith("/") ? "" : "/"}${value}`;
 }

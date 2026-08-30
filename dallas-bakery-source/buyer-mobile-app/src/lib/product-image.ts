@@ -14,6 +14,11 @@ import { apiUrl } from "./api";
  * reached the fallback: a relative path is a non-empty string, so it is
  * truthy, and every product card was blank rather than showing the bundled
  * photo. Emptiness was never the failure mode — unresolvability was.
+ *
+ * The server now absolutises the URL before it leaves /api/buyer/catalog, so
+ * phones already in the field were fixed by a deploy rather than a release.
+ * This stays as the second line of defence: an older API, a cached response,
+ * or a hand-edited record can still hand us something unloadable.
  */
 
 const FALLBACK = require("../../assets/barbari-product.jpg");

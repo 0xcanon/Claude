@@ -39,6 +39,11 @@ const worker = {
       headers.set("X-Frame-Options", "DENY");
       headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
       headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+      // Deliberately no script-src: Stripe.js is loaded from js.stripe.com and
+      // mounts its card fields in iframes from js.stripe.com and
+      // m.stripe.network. That is what keeps raw card numbers out of this
+      // system and the business inside SAQ-A. If a script-src is ever added,
+      // those three hosts have to be allowlisted or checkout stops working.
       headers.set("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
       if (url.protocol === "https:") {
         headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
