@@ -4,7 +4,7 @@ Use this checklist before opening the website or submitting either app to an app
 
 ## 0. Re-verify the source
 
-- [ ] Run `npm ci && npm run verify` in `wholesale-site/` (lint, strict TypeScript, production build, and the full unit-test suite — 175 tests at the last packaging; the number only ever goes up, so treat a smaller count as a problem).
+- [ ] Run `npm ci && npm run verify` in `wholesale-site/` (lint, strict TypeScript, production build, and the full unit-test suite — 182 tests at the last packaging; the number only ever goes up, so treat a smaller count as a problem).
 - [ ] Run `npm ci && npm run typecheck && npm test` in `buyer-mobile-app/` and `owner-mobile-app/`.
 
 ## 1. Wholesale website
@@ -40,7 +40,8 @@ Products, buyer accounts, pricing and checkout all live in this system's own
 - [ ] Place one real card order end to end (site and app) and confirm the order number, the emailed receipt, and the shipping total all agree.
 - [ ] Grant Net 15 or Net 30 with a limit to one test account, place an order on account, and confirm no card is asked for and the available credit drops by the order total.
 - [ ] Push that account past its limit and confirm the order is refused rather than allowed to go negative.
-- [ ] Replace any homepage photo still hot-linked from the retail store's CDN with a file served from `wholesale-site/public/`.
+- [x] Homepage photography is served by this site. The four product photos that were hot-linked from the retail store's CDN now live in `wholesale-site/public/images/`, the remote-host allowlist is gone from `next.config.ts`, and `tests/no-hotlinked-assets.test.ts` fails under `npm run verify` if an external image URL comes back. That check is not part of a bare `npm run build`, so run `npm run verify` before you deploy.
+- [ ] If you replace a photo, put the file in `wholesale-site/public/images/` and use a path beginning `/images/` — never a URL on another company's server, or that picture goes blank the day they change it. There are two separate places: the **homepage marketing photos** live in `app/page.tsx`, and each **product's catalog photo** is the Image path field in `/admin` → Products. The server now refuses an `http(s)://` value in that field.
 
 ## 3. Native customer app
 

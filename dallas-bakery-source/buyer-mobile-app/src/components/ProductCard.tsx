@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { formatMoney, loafPrice, loavesPerCase } from "../lib/format";
+import { productImageSource } from "../lib/product-image";
 import { colors, fonts, shadow } from "../theme";
 import type { CatalogProduct } from "../types";
 
@@ -10,8 +11,6 @@ type Props = {
   onAdd: () => void;
   onOpen: () => void;
 };
-
-const fallbackImage = require("../../assets/barbari-product.jpg");
 
 export function ProductCard({ product, quantity, onAdd, onOpen }: Props) {
   const currency = product.variant.price.currencyCode;
@@ -26,7 +25,7 @@ export function ProductCard({ product, quantity, onAdd, onOpen }: Props) {
       <Image
         accessibilityLabel={product.imageAlt}
         resizeMode="cover"
-        source={product.imageUrl ? { uri: product.imageUrl } : fallbackImage}
+        source={productImageSource(product.imageUrl)}
         style={styles.image}
       />
       {soldOut && (

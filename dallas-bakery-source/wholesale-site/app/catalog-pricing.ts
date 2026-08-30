@@ -279,6 +279,34 @@ export function validateCustomerPriceCents(value: number): string | null {
 }
 
 /**
+ * Where a product photo is allowed to live.
+ *
+ * Only this site. A photo on someone else's server disappears the day that
+ * company reorganises, and the buyer catalog goes blank with no warning and no
+ * error — which is exactly what happened when the homepage photographs were
+ * hot-linked from the retail store's CDN.
+ *
+ * Site-relative is also the only form both surfaces can use: the website
+ * resolves it against its own origin, and the app resolves it against the API
+ * base. An absolute URL to our own domain would break the app the moment the
+ * domain changed.
+ */
+export function validateImageUrl(imageUrl: string | undefined): string | null {
+  const value = String(imageUrl || "").trim();
+  if (!value) return null; // Optional — the catalog falls back to a stock photo.
+  if (/^https?:\/\//i.test(value)) {
+    return "Use a photo stored on this site, like /images/barbari.webp. A link to another company's server stops working the day they change it.";
+  }
+  if (!value.startsWith("/")) {
+    return "The photo path has to start with a slash, like /images/barbari.webp.";
+  }
+  if (value.includes("..")) {
+    return "That photo path is not valid.";
+  }
+  return null;
+}
+
+/**
  * Validates the editable fields of a product the way the admin API stores
  * them. Returns an error message, or null when everything is sound.
  */
@@ -293,7 +321,11 @@ export function validateProductInput(input: {
   boxHeightIn: number;
   dailyCapacityCases?: number;
   maxCasesPerOrder?: number;
+  imageUrl?: string;
 }): string | null {
+  const imageProblem = validateImageUrl(input.imageUrl);
+  if (imageProblem) return imageProblem;
+
   for (const [label, value] of [
     ["Daily capacity", input.dailyCapacityCases],
     ["Per-order limit", input.maxCasesPerOrder],

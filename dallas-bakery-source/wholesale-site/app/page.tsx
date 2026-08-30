@@ -11,8 +11,7 @@ const products = [
     note: "Traditional sesame finish",
     description:
       "A substantial, ridged Persian flatbread with a tender center and crisp, golden edges.",
-    image:
-      "https://dallasbakery.com/cdn/shop/files/barbari-bread-box-14-197.webp?v=1682804901&width=1200",
+    image: "/images/classic-barbari.webp",
     accent: "Best seller",
     allergens: "Contains wheat and sesame",
     netWeight: "14 oz (397 g) per loaf",
@@ -22,8 +21,7 @@ const products = [
     note: "No sesame seeds",
     description:
       "The same signature bake with a clean top—ideal for kitchens managing sesame preferences.",
-    image:
-      "https://dallasbakery.com/cdn/shop/files/natural-box-price-expiration-date-867.webp?v=1682805151&width=1200",
+    image: "/images/natural-barbari.webp",
     accent: "Versatile",
     allergens: "Contains wheat. Made in a bakery that also handles sesame",
     netWeight: "14 oz (397 g) per loaf",
@@ -33,8 +31,7 @@ const products = [
     note: "Hearty whole wheat",
     description:
       "A fuller-flavored option for breakfast programs, sandwiches, dips, and table service.",
-    image:
-      "https://dallasbakery.com/cdn/shop/files/whole-wheat-box-great-pizzas-soups-473.webp?v=1682805130&width=1200",
+    image: "/images/whole-wheat-barbari.webp",
     accent: "Whole grain",
     allergens: "Contains wheat. Made in a bakery that also handles sesame",
     netWeight: "13.5 oz (383 g) per loaf",
@@ -113,7 +110,7 @@ export default async function Home() {
         <div className="hero-visual">
           <div className="hero-image-wrap">
             <Image
-              src="https://dallasbakery.com/cdn/shop/files/barbari-bread-box-14-197.webp?v=1682804901&width=1600"
+              src="/images/classic-barbari.webp"
               alt="Golden Persian Barbari bread from Dallas Bakery"
               fill
               priority
@@ -204,7 +201,7 @@ export default async function Home() {
       <section className="use-section">
         <div className="use-image">
           <Image
-            src="https://dallasbakery.com/cdn/shop/files/sesame-bread-39-pack-dallas-bakery-553.webp?v=1682617659&width=1400"
+            src="/images/sesame-barbari.webp"
             alt="Sesame Barbari bread ready for foodservice"
             fill
             unoptimized

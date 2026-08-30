@@ -4,6 +4,7 @@ import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } fr
 import { BrandLockup } from "../components/BrandLockup";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { caseLabel, formatMoney, loafLabel, loafPrice, loavesPerCase, normalizeQuantity } from "../lib/format";
+import { productImageSource } from "../lib/product-image";
 import { colors, fonts } from "../theme";
 import type { BuyerLocation, CatalogProduct } from "../types";
 
@@ -14,8 +15,6 @@ type Props = {
   onSetQuantity: (quantity: number) => void;
   product: CatalogProduct;
 };
-
-const fallbackImage = require("../../assets/barbari-product.jpg");
 
 export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQuantity, product }: Props) {
   const rule = product.variant.quantityRule;
@@ -50,7 +49,7 @@ export function ProductDetailScreen({ initialQuantity, location, onBack, onSetQu
         <View style={styles.headerSpace} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Image source={product.imageUrl ? { uri: product.imageUrl } : fallbackImage} style={styles.image} />
+        <Image source={productImageSource(product.imageUrl)} style={styles.image} />
         <Text style={styles.tag}>{spec?.certifications ? spec.certifications.toUpperCase() : "KOSHER · HALAL"}</Text>
         <Text style={styles.title}>{product.title}</Text>
         <Text style={styles.description}>{product.description || "Traditional Persian Barbari flatbread with a 14-day shelf life."}</Text>

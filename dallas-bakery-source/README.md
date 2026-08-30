@@ -69,7 +69,7 @@ cd buyer-mobile-app && npm ci && npm run typecheck && npm test
 cd owner-mobile-app && npm ci && npm run typecheck && npm test
 ```
 
-At the last packaging of this source: **175 wholesale-site tests passing**,
+At the last packaging of this source: **182 wholesale-site tests passing**,
 lint and strict TypeScript clean across all three projects, and 17 database
 migrations applying cleanly to an empty database.
 
