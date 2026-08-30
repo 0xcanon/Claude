@@ -4,7 +4,7 @@ Use this checklist before opening the website or submitting either app to an app
 
 ## 0. Re-verify the source
 
-- [ ] Run `npm ci && npm run verify` in `wholesale-site/` (lint, strict TypeScript, production build, 16 unit tests).
+- [ ] Run `npm ci && npm run verify` in `wholesale-site/` (lint, strict TypeScript, production build, and the full unit-test suite — 175 tests at the last packaging; the number only ever goes up, so treat a smaller count as a problem).
 - [ ] Run `npm ci && npm run typecheck && npm test` in `buyer-mobile-app/` and `owner-mobile-app/`.
 
 ## 1. Wholesale website
@@ -16,35 +16,43 @@ Use this checklist before opening the website or submitting either app to an app
 - [ ] Add the mail provider's SPF and DKIM records plus a DMARC record on the **dallasbakery.net** zone, then send a test approval and confirm inbox delivery and that replies reach `sales@dallasbakery.com`.
 - [ ] Confirm the `/admin` "Launch connections" panel shows **Email notifications** active.
 - [ ] If deploying outside the original hosting platform, follow `wholesale-site/DEPLOYMENT.md`: create the D1 database, set its id in `wrangler.deploy.jsonc`, run `npm run db:migrate`, set every secret, then `npm run deploy`.
-- [ ] Apply all committed database migrations, including `0006_nice_darkstar.sql` for secure buyer application tracking.
+- [ ] Apply every committed migration in `wholesale-site/drizzle/` with `npm run db:migrate` (17 at the last packaging, through `0016_order_lifecycle_and_support.sql`), and confirm the run reports no pending files.
 - [ ] Add the commercial-address and business-category screening credentials.
 - [ ] Connect `dallasbakery.net`, complete DNS/SSL validation, and set `PUBLIC_SITE_URL=https://dallasbakery.net`.
 - [ ] Change hosting access to public only when launch configuration is complete. The app-owned `/admin` authentication continues to protect the owner portal.
 - [ ] Sign in with the temporary owner password and immediately set a new private password.
 
-## 2. Products, B2B accounts, and checkout
+## 2. Products, pricing, and checkout
 
-- [ ] Create the wholesale bread product at $2.50 per individual unit.
-- [ ] Add the 14-day shelf-life, Kosher, and Halal product information.
-- [ ] Enable customer accounts and B2B company/company-location support.
-- [ ] Publish wholesale products to the intended private catalog and assign that catalog to approved company locations.
+Products, buyer accounts, pricing and checkout all live in this system's own
+`/admin`. There is no external storefront to configure.
+
+- [ ] Add each bread in `/admin` → Products: name, SKU, case size, ingredients, allergens, shelf life, and the box weight and dimensions UPS is billed on.
+- [ ] Confirm the 14-day shelf life, Kosher and Halal information reads the same in `/admin`, on the website, in the app, and **on the physical bag**.
+- [ ] Set stock and daily capacity per product, and confirm an out-of-stock bread disappears from the buyer catalog rather than failing at checkout.
+- [ ] Set the shipping rate and units per box under Live order settings, and confirm the website and both apps show the new value immediately.
+- [ ] Re-weigh a packed box and store the weight and dimensions. UPS bills on these.
+- [ ] Set the price for each approved customer in `/admin` → pricing. **Confirm a signed-in buyer sees only their own price, with nothing indicating anyone pays differently.**
+- [ ] Open the site signed out and confirm **no price appears on any public page**, and that no public API endpoint returns one.
 - [ ] Set `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` as Worker secrets, and confirm `/admin` shows **Card payments** active.
-- [ ] Configure a branded customer-account hostname and branded checkout theme.
-- [ ] Point a Stripe webhook at `https://dallasbakery.net/api/webhooks/stripe` for `payment_intent.succeeded` and `checkout.session.completed`, set `STRIPE_WEBHOOK_SECRET`, and confirm a test order reaches the admin shipping queue.
-- [ ] Place one real card order end to end (site and app) and confirm the order number, the emailed receipt, and the per-case shipping total all agree.
-- [ ] Replace the homepage photos hot-linked from the retail store's CDN with files served from `wholesale-site/public/` so the wholesale site owns its own imagery.
-- [ ] Confirm shipping totals: 1–25 units = $12.50; 26–50 = $25.00; 51–75 = $37.50.
+- [ ] Point a Stripe webhook at `https://dallasbakery.net/api/webhooks/stripe` for `payment_intent.succeeded` and `checkout.session.completed`, set `STRIPE_WEBHOOK_SECRET`, and confirm a test order reaches the shipping queue.
+- [ ] Re-send that same webhook event from the Stripe dashboard and confirm it does **not** create a second order. Evidence: ______________________
+- [ ] Place one real card order end to end (site and app) and confirm the order number, the emailed receipt, and the shipping total all agree.
+- [ ] Grant Net 15 or Net 30 with a limit to one test account, place an order on account, and confirm no card is asked for and the available credit drops by the order total.
+- [ ] Push that account past its limit and confirm the order is refused rather than allowed to go negative.
+- [ ] Replace any homepage photo still hot-linked from the retail store's CDN with a file served from `wholesale-site/public/`.
 
 ## 3. Native customer app
 
-- [ ] Create `buyer-mobile-app/.env` from its example for local work; define all five `EXPO_PUBLIC_*` values as EAS environment variables for the `preview` and `production` profiles — signed builds now fail if any is missing or still a placeholder.
+- [ ] Create `buyer-mobile-app/.env` from its example for local work; define all three `EXPO_PUBLIC_*` values (`EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_EAS_PROJECT_ID`) as EAS environment variables for the `preview` and `production` profiles — signed builds fail if any is missing or still a placeholder.
 - [ ] Use the **publishable** Stripe key (`pk_…`) in the app. The secret key (`sk_…`) must never appear in mobile or browser code; a signed build refuses to start without a `pk_` value.
-- [ ] Register the Customer Account API client as a public mobile OAuth client using Authorization Code + PKCE.
-- [ ] Register the exact custom redirect URI beginning with `shop.{shop_id}.`.
-- [ ] Obtain any protected-customer-data approvals required for customer, company, location, and order access.
+- [ ] Sign in on a device with an emailed six-digit code and confirm the code arrives, expires, and cannot be reused. Buyer sign-in is this system's own; there is no external OAuth client to register.
+- [ ] Confirm push notifications arrive on a physical device, and that turning them off in the app's notification settings stops them without breaking tracking or invoice email.
 - [ ] Test application submission and live approval tracking against the production domain.
-- [ ] Test one-location and multiple-location buyers; changing location must clear the cart and reload contextual pricing.
-- [ ] Test private catalog, quantity rules, cart, secure checkout, session expiry (an expired session in the catalog or at checkout must return to sign-in, not a retry loop), order history, and sign-out on physical iPhone and Android devices.
+- [ ] Test one-location and multiple-location buyers; changing location must clear the cart and reload that location's own prices.
+- [ ] Test the signed-in catalog, case minimums and increments, cart, checkout, session expiry (an expired session in the catalog or at checkout must return to sign-in, not a retry loop), order history, and sign-out on physical iPhone and Android devices.
+- [ ] Report a problem from an order in the app, answer it in `/admin`, and confirm the reply reaches the buyer's inbox and shows in the app.
+- [ ] Open an order's **Details & history** in `/admin` and confirm the audit trail reads correctly and prints.
 - [ ] Submit the same application twice and confirm the second attempt shows the "already in review" notice without issuing a new tracking credential.
 - [ ] Verify launch and splash screens render on both platforms in a signed build.
 
