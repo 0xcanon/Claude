@@ -93,7 +93,7 @@ type Order = {
   name: string;
   processedAt: string;
   shippedAt: string | null;
-  stage: "paid" | "labeled" | "shipped" | "refunded";
+  stage: "paid" | "held" | "labeled" | "shipped" | "delivered" | "cancelled" | "refunded";
   stageLabel: string;
   stageDetail: string;
   stageStep: 1 | 2 | 3;
@@ -110,6 +110,19 @@ type Order = {
   paymentTerms?: "card" | "account";
   invoicePaid?: boolean;
   invoiceDueAt?: string;
+  /** Decided by the server — the bakery knows whether it is already boxed. */
+  canRequestCancellation?: boolean;
+  cancelRequested?: boolean;
+  holdReason?: string;
+  refunded?: string;
+};
+
+/** A reason a buyer can raise a problem about, as the server words it. */
+type SupportReason = {
+  key: string;
+  label: string;
+  prompt: string;
+  needsOrder: boolean;
 };
 
 const SESSION_KEY = "db-wholesale-session";
@@ -187,6 +200,16 @@ export function OrderPortal() {
   const [deliveryWindow, setDeliveryWindow] = useState<DeliveryWindow | null>(null);
 
   // Invoices and statements, for the buyer's bookkeeper.
+  // Telling the bakery something went wrong. `problemFor` is the order id the
+  // form is open on, so only one order shows a form at a time.
+  const [supportReasons, setSupportReasons] = useState<SupportReason[]>([]);
+  const [problemFor, setProblemFor] = useState("");
+  const [problemReason, setProblemReason] = useState("");
+  const [problemMessage, setProblemMessage] = useState("");
+  const [problemBusy, setProblemBusy] = useState(false);
+  const [problemNotice, setProblemNotice] = useState("");
+  const [problemError, setProblemError] = useState("");
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [openBalanceCents, setOpenBalanceCents] = useState(0);
   const [documentBusy, setDocumentBusy] = useState("");
@@ -237,11 +260,12 @@ export function OrderPortal() {
     setError("");
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [catalogResponse, ordersResponse, standingResponse, documentsResponse] = await Promise.all([
+      const [catalogResponse, ordersResponse, standingResponse, documentsResponse, supportResponse] = await Promise.all([
         fetch("/api/buyer/catalog", { headers, cache: "no-store" }),
         fetch("/api/buyer/orders", { headers, cache: "no-store" }),
         fetch("/api/buyer/standing-order", { headers, cache: "no-store" }),
         fetch("/api/buyer/documents", { headers, cache: "no-store" }),
+        fetch("/api/buyer/support", { headers, cache: "no-store" }),
       ]);
       if (catalogResponse.status === 401 || catalogResponse.status === 403) {
         signOut();
@@ -270,6 +294,12 @@ export function OrderPortal() {
       if (ordersResponse.ok) {
         const data = await ordersResponse.json();
         setOrders(data.orders || []);
+      }
+      // The reasons come from the server so the site and the app offer the
+      // same words for the same problem.
+      if (supportResponse.ok) {
+        const data = await supportResponse.json();
+        setSupportReasons(data.reasons || []);
       }
       if (standingResponse.ok) {
         const data = await standingResponse.json();
@@ -482,6 +512,47 @@ export function OrderPortal() {
    * catalog are skipped rather than failing the reorder, and the page scrolls
    * back to the summary so the refilled cart is in view.
    */
+  /**
+   * Files a problem, or asks for a cancellation.
+   *
+   * Neither decides anything. The bakery reads it, and answers by email —
+   * which is why the confirmation here says "we'll come back to you" and not
+   * "your refund is on its way".
+   */
+  async function sendProblem(order: Order, action: "report" | "cancel") {
+    if (!session) return;
+    if (action === "report" && (!problemReason || !problemMessage.trim())) {
+      setProblemError("Pick what happened, and tell us a little about it.");
+      return;
+    }
+    setProblemBusy(true);
+    setProblemError("");
+    setProblemNotice("");
+    try {
+      const response = await fetch("/api/buyer/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+        body: JSON.stringify({
+          action,
+          orderId: order.id,
+          reason: problemReason,
+          message: problemMessage,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "That could not be sent.");
+      setProblemNotice(data.message || "Sent. We'll come back to you.");
+      setProblemFor("");
+      setProblemReason("");
+      setProblemMessage("");
+      await loadShop(session.token);
+    } catch (caught) {
+      setProblemError(caught instanceof Error ? caught.message : "That could not be sent.");
+    } finally {
+      setProblemBusy(false);
+    }
+  }
+
   function reorder(order: Order) {
     const next: Record<string, number> = {};
     for (const item of order.items) {
@@ -963,6 +1034,7 @@ export function OrderPortal() {
       {orders.length > 0 && (
         <section className="buyer-orders">
           <h3>My orders</h3>
+          {problemNotice && <p className="buyer-problem-sent">{problemNotice}</p>}
           <div className="buyer-order-list">
             {orders.map((order) => (
               <article className="buyer-order" key={order.id}>
@@ -1016,9 +1088,93 @@ export function OrderPortal() {
                   </p>
                 )}
 
+                {order.holdReason && order.stage === "held" && (
+                  <p className="buyer-order-notice">
+                    <strong>On hold.</strong> {order.holdReason}
+                  </p>
+                )}
+                {order.cancelRequested && order.stage !== "cancelled" && (
+                  <p className="buyer-order-notice">
+                    You&rsquo;ve asked us to cancel this one. We&rsquo;re on it — we&rsquo;ll confirm today.
+                  </p>
+                )}
+                {order.refunded && Number(order.refunded) > 0 && (
+                  <p className="buyer-order-notice">
+                    <strong>${order.refunded}</strong> has been sent back to you.
+                  </p>
+                )}
+
                 <button type="button" className="buyer-reorder" onClick={() => reorder(order)}>
                   Order these cases again →
                 </button>
+
+                {order.stage !== "cancelled" && (
+                  <div className="buyer-order-help">
+                    <button
+                      type="button"
+                      className="buyer-problem-toggle"
+                      aria-expanded={problemFor === order.id}
+                      onClick={() => {
+                        setProblemFor(problemFor === order.id ? "" : order.id);
+                        setProblemReason("");
+                        setProblemMessage("");
+                        setProblemError("");
+                        setProblemNotice("");
+                      }}
+                    >
+                      {problemFor === order.id ? "Never mind" : "Something wrong with this order?"}
+                    </button>
+
+                    {problemFor === order.id && (
+                      <div className="buyer-problem">
+                        {order.canRequestCancellation && (
+                          <button
+                            type="button"
+                            className="buyer-problem-cancel"
+                            disabled={problemBusy}
+                            onClick={() => void sendProblem(order, "cancel")}
+                          >
+                            {problemBusy ? "Sending…" : "Ask us to cancel this order"}
+                          </button>
+                        )}
+
+                        <label htmlFor={`problem-reason-${order.id}`}>What happened?</label>
+                        <select
+                          id={`problem-reason-${order.id}`}
+                          value={problemReason}
+                          onChange={(event) => setProblemReason(event.target.value)}
+                        >
+                          <option value="">Pick one…</option>
+                          {supportReasons.map((reason) => (
+                            <option key={reason.key} value={reason.key}>{reason.label}</option>
+                          ))}
+                        </select>
+
+                        <label htmlFor={`problem-message-${order.id}`}>
+                          {supportReasons.find((reason) => reason.key === problemReason)?.prompt
+                            || "Tell us what happened and we'll sort it out."}
+                        </label>
+                        <textarea
+                          id={`problem-message-${order.id}`}
+                          rows={3}
+                          maxLength={2000}
+                          value={problemMessage}
+                          onChange={(event) => setProblemMessage(event.target.value)}
+                        />
+
+                        <button
+                          type="button"
+                          className="buyer-problem-send"
+                          disabled={problemBusy || !problemReason || !problemMessage.trim()}
+                          onClick={() => void sendProblem(order, "report")}
+                        >
+                          {problemBusy ? "Sending…" : "Send this to the bakery"}
+                        </button>
+                        {problemError && <p className="buyer-problem-error">{problemError}</p>}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <details className="buyer-order-items">
                   <summary>What was in this order</summary>

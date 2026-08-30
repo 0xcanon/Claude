@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
+import { OrderActionsPanel } from "./order-actions-panel";
+
 type OrderItem = { sku: string; name: string; quantity: number; unitAmountCents: number };
 
 type ShippingOrder = {
@@ -31,6 +33,12 @@ type ShippingOrder = {
   poNumber: string;
   /** The delivery day the buyer asked for, when they picked one. */
   requestedDeliveryDate: string | null;
+  refundedCents: number;
+  holdReason: string;
+  cancelRequestedAt: string | null;
+  cancelReason: string;
+  cancelledAt: string | null;
+  deliveredAt: string | null;
   trackingNumber: string;
   trackingUrl: string;
   labelError: string;
@@ -60,8 +68,11 @@ function invoiceTag(order: { invoicePaidAt: string | null; invoiceDueAt: string 
 /** The same words the buyer sees, so the owner and the buyer agree. */
 function statusLabel(status: string) {
   if (status === "shipped") return "Shipped";
+  if (status === "delivered") return "Delivered";
   if (status === "labeled") return "Packed · label bought";
   if (status === "refunded") return "Refunded";
+  if (status === "cancelled") return "Cancelled";
+  if (status === "held") return "On hold";
   return "Baking";
 }
 
@@ -97,7 +108,13 @@ export function ShippingQueue() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(scope); }, [load, scope]);
 
-  const selectable = useMemo(() => orders.filter((order) => order.status !== "shipped"), [orders]);
+  // A box is only ever bought for an order that is still going out. Held,
+  // cancelled, refunded and already-shipped orders can't be selected at all,
+  // so a select-all can never buy a label for one.
+  const selectable = useMemo(
+    () => orders.filter((order) => order.status === "paid" || order.status === "labeled"),
+    [orders],
+  );
 
   /** What the bench needs at a glance: how much bread, how many boxes, what it earned. */
   const totals = useMemo(() => orders.reduce((sum, order) => ({
@@ -141,37 +158,6 @@ export function ShippingQueue() {
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(selectable.map((order) => order.id)));
-  }
-
-  async function refund(order: ShippingOrder) {
-    const onAccount = order.paymentTerms === "account";
-    const sure = window.confirm(
-      onAccount
-        ? `Cancel order #${order.orderNumber} — ${money(order.totalCents)} on account for ${order.customerName || order.email}?\n\nNothing was charged; cancelling releases the amount back to their credit line and the order leaves the shipping queue.`
-        : `Refund order #${order.orderNumber} — ${money(order.totalCents)} back to ${order.customerName || order.email}?\n\nThis cannot be undone, and the order leaves the shipping queue.`,
-    );
-    if (!sure) return;
-    setBusy("refund");
-    setMessage("");
-    setError("");
-    try {
-      const response = await fetch("/api/admin/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "refund", ids: [order.id] }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "The refund did not complete.");
-      setMessage(data.onAccount
-        ? `Order #${data.orderNumber} cancelled — the amount is back on the buyer's credit line.`
-        : `Order #${data.orderNumber} refunded in full.`);
-      setOpenOrder("");
-      await load(scope);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The refund did not complete.");
-    } finally {
-      setBusy("");
-    }
   }
 
   async function markInvoicePaid(order: ShippingOrder) {
@@ -386,7 +372,7 @@ export function ShippingQueue() {
                     <input
                       type="checkbox"
                       checked={selected.has(order.id)}
-                      disabled={order.status === "shipped"}
+                      disabled={!selectable.some((row) => row.id === order.id)}
                       onChange={() => toggle(order.id)}
                       aria-label={`Select order ${order.orderNumber}`}
                     />
@@ -485,19 +471,8 @@ export function ShippingQueue() {
                             {busy === "invoice-paid" ? "Saving…" : "Mark invoice paid"}
                           </button>
                         )}
-                        {order.status !== "shipped" && order.status !== "refunded" && (
-                          <button
-                            type="button"
-                            className="admin-refund"
-                            disabled={busy === "refund"}
-                            onClick={() => void refund(order)}
-                          >
-                            {busy === "refund"
-                              ? (order.paymentTerms === "account" ? "Cancelling…" : "Refunding…")
-                              : (order.paymentTerms === "account" ? "Cancel order" : `Refund ${money(order.totalCents)}`)}
-                          </button>
-                        )}
                       </div>
+                      <OrderActionsPanel order={order} onChanged={() => load(scope)} />
                     </div>
                   </td>
                 </tr>

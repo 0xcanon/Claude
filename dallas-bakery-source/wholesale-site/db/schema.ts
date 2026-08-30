@@ -145,8 +145,23 @@ export const orders = sqliteTable("orders", {
   poNumber: text("po_number").notNull().default(""),
   // The delivery date the buyer asked for (YYYY-MM-DD), when they chose one.
   requestedDeliveryDate: text("requested_delivery_date"),
-  // "paid" -> "labeled" -> "shipped"
+  // paid -> labeled -> shipped -> delivered, with held and cancelled as the
+  // two ways an order leaves that path. "refunded" is kept for orders that
+  // were sent back in full; a partial refund leaves the status alone and
+  // records the amount in refundedCents.
   status: text("status").notNull().default("paid"),
+  // Why the owner paused it — a bad address, a credit question, an oven
+  // problem. Cleared when it is released.
+  holdReason: text("hold_reason").notNull().default(""),
+  // The buyer asked to cancel. The owner still has to agree, because by then
+  // the bread may already be baked.
+  cancelRequestedAt: text("cancel_requested_at"),
+  cancelReason: text("cancel_reason").notNull().default(""),
+  cancelledAt: text("cancelled_at"),
+  deliveredAt: text("delivered_at"),
+  // Money sent back, in cents. A short shipment is refunded in part and the
+  // rest of the order still ships, so this is an amount and not a flag.
+  refundedCents: integer("refunded_cents").notNull().default(0),
   trackingNumber: text("tracking_number").notNull().default(""),
   labelFormat: text("label_format").notNull().default(""),
   // Base64 label payload returned by UPS (ZPL for thermal printers).
@@ -315,4 +330,66 @@ export const pushDevices = sqliteTable(
     lastSeenAt: text("last_seen_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [index("push_devices_audience_idx").on(table.audience, table.applicationId)],
+);
+
+/**
+ * Everything that ever happened to an order, in order, never edited.
+ *
+ * This is what answers "what happened to order 1042, who did it, and what did
+ * we tell the buyer" six months later — for a dispute, a chargeback, or an
+ * accountant. Rows are only ever inserted.
+ */
+export const orderEvents = sqliteTable(
+  "order_events",
+  {
+    id: text("id").primaryKey(),
+    orderId: text("order_id").notNull(),
+    kind: text("kind").notNull(),
+    /** One line, written for whoever reads it next. */
+    summary: text("summary").notNull(),
+    /** Anything longer: an address correction, a refund reason, a note. */
+    detail: text("detail").notNull().default(""),
+    /** "owner:sales@…", "buyer:ap@…", "system", "stripe". Never blank. */
+    actor: text("actor").notNull(),
+    /** Money moved by this event, in cents. Zero for everything else. */
+    amountCents: integer("amount_cents").notNull().default(0),
+    /** Whether the buyer sees this line in their own order history. */
+    buyerVisible: integer("buyer_visible", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("order_events_order_idx").on(table.orderId, table.createdAt)],
+);
+
+/**
+ * A problem a buyer raised, and what the bakery did about it.
+ *
+ * Reasons are structured rather than free text so the owner can see that
+ * three shops reported a damaged box on the same day — which is a pallet
+ * problem, not three unlucky customers.
+ */
+export const supportCases = sqliteTable(
+  "support_cases",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id").notNull(),
+    businessName: text("business_name").notNull().default(""),
+    contactEmail: text("contact_email").notNull().default(""),
+    /** Empty when the question is not about one order. */
+    orderId: text("order_id").notNull().default(""),
+    orderNumber: integer("order_number").notNull().default(0),
+    reason: text("reason").notNull(),
+    message: text("message").notNull(),
+    status: text("status").notNull().default("open"),
+    /** What the bakery said back. The buyer sees this. */
+    reply: text("reply").notNull().default(""),
+    /** Internal, never shown to the buyer. */
+    ownerNotes: text("owner_notes").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    resolvedAt: text("resolved_at"),
+  },
+  (table) => [
+    index("support_cases_status_idx").on(table.status, table.createdAt),
+    index("support_cases_application_idx").on(table.applicationId),
+  ],
 );

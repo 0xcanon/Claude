@@ -3,6 +3,7 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 
 import { runInvoiceReminders } from "../app/invoice-reminders.ts";
+import { alertOwner, log } from "../app/observability.ts";
 import { runDueStandingOrders } from "../app/standing-orders.ts";
 
 interface Env {
@@ -86,18 +87,31 @@ const scheduled = async (_event: { cron: string }, _env: Env, ctx: ExecutionCont
   ctx.waitUntil(
     runDueStandingOrders()
       .then((outcomes) => {
-        if (outcomes.length) {
-          console.log(`Standing orders run: ${outcomes.filter((o) => o.ok).length}/${outcomes.length} charged.`);
+        const charged = outcomes.filter((o) => o.ok).length;
+        log("info", "cron.standing_orders", { total: outcomes.length, charged });
+        // Some ran and some did not: the owner needs to place those by hand.
+        if (outcomes.length && charged < outcomes.length) {
+          void alertOwner(
+            "cron-standing-orders",
+            `${outcomes.length - charged} of ${outcomes.length} standing orders did not go through.`,
+            { charged, total: outcomes.length },
+          );
         }
       })
-      .catch((caught) => console.error("Standing orders run failed:", caught)),
+      .catch((caught) => alertOwner(
+        "cron-standing-orders",
+        caught instanceof Error ? caught.message : String(caught),
+      )),
   );
   ctx.waitUntil(
     runInvoiceReminders()
       .then((outcomes) => {
-        if (outcomes.length) console.log(`Invoice reminders sent: ${outcomes.length}.`);
+        log("info", "cron.invoice_reminders", { sent: outcomes.length });
       })
-      .catch((caught) => console.error("Invoice reminder run failed:", caught)),
+      .catch((caught) => alertOwner(
+        "cron-invoice-reminders",
+        caught instanceof Error ? caught.message : String(caught),
+      )),
   );
 };
 

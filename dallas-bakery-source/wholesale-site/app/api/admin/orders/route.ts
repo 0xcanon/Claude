@@ -99,6 +99,16 @@ export async function GET(request: Request) {
           // first when a day's orders exceed a truck.
           poNumber: order.poNumber,
           requestedDeliveryDate: order.requestedDeliveryDate,
+          // The lifecycle fields the actions panel needs to decide what it
+          // is allowed to offer: how much has already gone back, why the
+          // order is paused, and whether the buyer has asked to cancel.
+          refundedCents: order.refundedCents,
+          holdReason: order.holdReason,
+          cancelRequestedAt: order.cancelRequestedAt,
+          cancelReason: order.cancelReason,
+          cancelledAt: order.cancelledAt,
+          deliveredAt: order.deliveredAt,
+
           trackingNumber: order.trackingNumber,
           trackingUrl: trackingUrl(order.trackingNumber),
           labelError: order.labelError,

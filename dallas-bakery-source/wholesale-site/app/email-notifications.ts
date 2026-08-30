@@ -490,3 +490,66 @@ export function ownerAccountClosedEmail(input: {
     ].join("\n"),
   };
 }
+
+/**
+ * A buyer has reported a problem. This goes to the owner immediately, because
+ * a shop with a missing delivery cannot wait for someone to happen to open
+ * the admin portal.
+ */
+export function supportCaseOwnerEmail(input: {
+  businessName: string;
+  contactEmail: string;
+  reasonLabel: string;
+  message: string;
+  orderNumber: number;
+  urgency: "now" | "today" | "soon";
+}): MailMessage {
+  const order = input.orderNumber ? ` on order #${input.orderNumber}` : "";
+  return {
+    to: ownerNotificationAddress(),
+    subject: `${input.urgency === "now" ? "Needs an answer today: " : ""}${input.businessName}: ${input.reasonLabel}`,
+    text: [
+      `${input.businessName} reported a problem${order}.`,
+      ``,
+      `What: ${input.reasonLabel}`,
+      `They said:`,
+      input.message,
+      ``,
+      `Reply to them: ${input.contactEmail}`,
+      `Answer it in the portal: ${OWNER_PORTAL_URL}`,
+      ``,
+      input.urgency === "now"
+        ? `This is the kind that costs them money. Answer it today.`
+        : `No rush, but don't let it sit.`,
+    ].join("\n"),
+  };
+}
+
+/** The bakery's answer, in the buyer's inbox rather than only in the app. */
+export function supportCaseReplyEmail(input: {
+  email: string;
+  reasonLabel: string;
+  reply: string;
+  orderNumber: number;
+  resolved: boolean;
+}): MailMessage {
+  const order = input.orderNumber ? ` about order #${input.orderNumber}` : "";
+  return {
+    to: input.email,
+    subject: `Dallas Bakery: ${input.reasonLabel}`,
+    text: [
+      `Hi,`,
+      ``,
+      `About what you told us${order} — ${input.reasonLabel.toLowerCase()}:`,
+      ``,
+      input.reply,
+      ``,
+      input.resolved
+        ? `We've marked this one sorted. If it isn't, just reply to this email.`
+        : `We'll keep you posted. Reply to this email any time.`,
+      ``,
+      `${SUPPORT_EMAIL} · ${SUPPORT_PHONE}`,
+      `- Dallas Bakery Wholesale`,
+    ].join("\n"),
+  };
+}

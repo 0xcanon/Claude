@@ -10,6 +10,9 @@ import { apiUrl } from "./api";
 import type {
   BuyerInvoice,
   BuyerSession,
+  BuyerSupportCase,
+  OrderTimeline,
+  SupportReasonOption,
   CartQuantityMap,
   CatalogProduct,
   ClosurePreview,
@@ -439,4 +442,65 @@ export async function setNotificationPreferences(
     );
   }
   return (data as { preferences: NotificationPreferences }).preferences;
+}
+
+/* ----------------------------------------------------- telling us a problem -- */
+
+/**
+ * The reasons a buyer can pick from, and the cases they have already raised.
+ *
+ * The list comes from the server so the app and the website offer the same
+ * words — a shop that reports "the order was short" in the app and sees
+ * something different on the site would reasonably wonder which one we read.
+ */
+export async function getSupportCases(session: BuyerSession) {
+  return authorized<{
+    reasons: SupportReasonOption[];
+    maxMessageLength: number;
+    cases: BuyerSupportCase[];
+  }>("/api/buyer/support", session);
+}
+
+/** Files a problem. `orderId` is required for the order-specific reasons. */
+export async function reportProblem(
+  session: BuyerSession,
+  input: { reason: string; message: string; orderId?: string },
+) {
+  return authorized<{ ok: true; case: { id: string; status: string }; message: string }>(
+    "/api/buyer/support",
+    session,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "report", ...input }),
+    },
+  );
+}
+
+/**
+ * Asks for an order to be cancelled. It is a request: by now the bread may
+ * already be baked, so the bakery answers rather than the app deciding.
+ */
+export async function askToCancelOrder(
+  session: BuyerSession,
+  orderId: string,
+  message: string,
+) {
+  return authorized<{ ok: true; requested: true; message: string }>(
+    "/api/buyer/support",
+    session,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel", orderId, message }),
+    },
+  );
+}
+
+/** One order's story: what happened to it, when, and who did it. */
+export async function getOrderTimeline(session: BuyerSession, orderId: string) {
+  return authorized<OrderTimeline>(
+    `/api/buyer/orders?id=${encodeURIComponent(orderId)}`,
+    session,
+  );
 }

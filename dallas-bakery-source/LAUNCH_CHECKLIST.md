@@ -55,7 +55,28 @@ Use this checklist before opening the website or submitting either app to an app
 - [ ] Test pending/approved/declined queues, application details, owner notes, account-setup retry, and multiple-location display.
 - [ ] Change the shipping rate in the owner app and confirm the website and buyer app immediately show the new value.
 
-## 5. App-store builds and final acceptance
+## 5. Running it safely from day one
+
+Everything in this section is in `OPERATIONS.md`, which is the day-to-day
+book. These are the ones that have to be true *before* the first real order.
+
+- [ ] Set `MAIL_OWNER_TO` (or rely on `ADMIN_LOGIN_EMAIL`) and confirm an owner alert actually arrives: temporarily break the UPS credentials, try a label, and check your inbox. Evidence: ______________________
+- [ ] Point an uptime monitor at `https://dallasbakery.net/api/health` every 5 minutes, alerting on anything that is not HTTP 200. Monitor name and alert address: ______________________
+- [ ] Load `/api/health` in production and confirm `stripe`, `ups`, `mail` all read **configured**. Date checked: ____________
+- [ ] Run `npm run db:backup` against production and confirm it prints **Backup verified**. Date and row counts: ______________________
+- [ ] Store that backup somewhere that is not the machine that made it, and write down where. Location: ______________________
+- [ ] Do a restore drill: take a backup, restore it into a scratch database, and open the restored data. Who did it and when: ______________________
+- [ ] Put a weekly backup in someone's calendar, with a name against it. Owner: ______________________
+- [ ] Walk one order through hold → correct → release → cancel in `/admin` on the live site and confirm the history reads correctly. Order number used: __________
+- [ ] Issue one real partial refund of a small amount and confirm it appears in Stripe, in the order history, and in the buyer's own order view. Order number: __________
+- [ ] Raise a support case from the buyer app, answer it from `/admin`, and confirm the reply reaches the buyer's inbox. Date: ____________
+- [ ] Complete and sign `COMPLIANCE_SIGNOFF.md` — food, tax, terms, and insurance. Signed on: ____________
+
+> The tax line in `COMPLIANCE_SIGNOFF.md` is the one that can cost real money.
+> **This system does not calculate or collect sales tax.** If tax is due on
+> these sales, that is a change to make before launch, not after.
+
+## 6. App-store builds and final acceptance
 
 - [ ] Create production builds using Dallas Bakery's Apple Developer, Google Play Console, and Expo/EAS accounts.
 - [ ] Set store listing support to `sales@dallasbakery.com` and privacy URL to `https://dallasbakery.net/privacy`.

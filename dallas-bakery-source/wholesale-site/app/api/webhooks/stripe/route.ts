@@ -18,14 +18,19 @@ import {
 import { cutoffState } from "../../../order-rules.ts";
 import { recordOrder, type NewOrderInput, type OrderChannel, type OrderItem } from "../../../orders-service.ts";
 import { priceOverridesFor } from "../../../customer-pricing.ts";
+import { alertOwner, log } from "../../../observability.ts";
 import { orderPlacedPush, ownerNewOrderPush } from "../../../push-messages.ts";
 import { pushToBuyer, pushToOwner } from "../../../push-notifications.ts";
 import { getWholesaleShippingSettings } from "../../../shipping-settings.ts";
+import {
+  planForEvent,
+  reconcileCapture,
+  shouldActOnExistingOrder,
+  signatureIsFresh,
+} from "../../../webhook-intake.ts";
 import { decodeCartLines, priceCart } from "../../../wholesale-catalog.ts";
 
 export const dynamic = "force-dynamic";
-
-const SIGNATURE_TOLERANCE_SECONDS = 300;
 
 function timingSafeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;
@@ -51,8 +56,9 @@ async function verifySignature(payload: string, header: string, secret: string) 
   ) as { t?: string; v1?: string };
   if (!parts.t || !parts.v1) return false;
 
-  const age = Math.abs(Math.floor(Date.now() / 1000) - Number(parts.t));
-  if (!Number.isFinite(age) || age > SIGNATURE_TOLERANCE_SECONDS) return false;
+  // Replay defense, separate from the HMAC: a captured body stays validly
+  // signed forever, so an old timestamp is rejected on its own.
+  if (!signatureIsFresh(header, Math.floor(Date.now() / 1000))) return false;
 
   const key = await crypto.subtle.importKey(
     "raw",
@@ -127,6 +133,28 @@ function readItems(session: StripeSession) {
  * that set the amount charged. If the two disagree the order is still recorded
  * against the amount Stripe actually captured, and the mismatch is logged.
  */
+/**
+ * Says so when Stripe retries an event for an order the bakery has already
+ * settled. Nothing is written — the dedupe key already made it a no-op — but
+ * a retry against a cancelled order means Stripe and the bakery disagree
+ * about that order, and that is worth being able to find in the logs.
+ */
+function noteLateDelivery(
+  result: { created: boolean; orderNumber: number; existingStatus: string },
+  dedupeKey: string,
+) {
+  if (result.created) return;
+  if (shouldActOnExistingOrder({ status: result.existingStatus })) {
+    log("info", "webhook.duplicate", { orderNumber: result.orderNumber, dedupeKey });
+    return;
+  }
+  log("warn", "webhook.late_after_settlement", {
+    orderNumber: result.orderNumber,
+    status: result.existingStatus,
+    dedupeKey,
+  });
+}
+
 async function recordFromPaymentIntent(intent: StripePaymentIntentEvent) {
   const meta = intent.metadata || {};
   // Only intents this site created for wholesale. A retail Checkout Session
@@ -144,19 +172,28 @@ async function recordFromPaymentIntent(intent: StripePaymentIntentEvent) {
   if (!cart.ok) {
     // Nothing sensible to put on a packing slip. Acknowledge so Stripe stops
     // retrying, and leave a loud log: the payment succeeded and needs a human.
-    console.error(
-      `Paid wholesale intent ${intent.id} could not be re-priced (${cart.error}). Record it by hand.`,
+    void alertOwner(
+      "webhook",
+      `A paid order could not be re-priced and is NOT in your shipping queue: ${cart.error}`,
+      { paymentIntent: intent.id, applicationId: String(meta.applicationId || "") },
     );
     return Response.json({ received: true, recorded: false });
   }
 
-  const capturedCents = Number(intent.amount_received || intent.amount || 0);
-  if (capturedCents !== cart.totalCents) {
-    console.error(
-      `Wholesale intent ${intent.id} captured ${capturedCents} but re-prices to ${cart.totalCents}. ` +
-      "Recording the captured amount; check the catalog for a price change mid-checkout.",
-    );
+  const captured = reconcileCapture(
+    Number(intent.amount_received || intent.amount || 0),
+    cart.totalCents,
+  );
+  if (captured.mismatch) {
+    // The charged amount is what goes on the order and the invoice; the owner
+    // is told because a silent drift is the expensive kind.
+    void alertOwner("webhook-amount", captured.alert || "", {
+      paymentIntent: intent.id,
+      capturedCents: captured.totalCents,
+      repricedCents: cart.totalCents,
+    });
   }
+  const capturedCents = captured.totalCents;
 
   const items: OrderItem[] = cart.lines.map((line) => ({
     sku: line.sku,
@@ -195,10 +232,15 @@ async function recordFromPaymentIntent(intent: StripePaymentIntentEvent) {
       requestedDeliveryDate: String(meta.requestedDeliveryDate || ""),
     };
     const result = await recordOrder(input);
+    noteLateDelivery(result, intent.id);
     await announceOrder(input, result, cart.caseCount);
     return Response.json({ received: true, created: result.created });
   } catch (caught) {
-    console.error("Wholesale order intake failed:", caught instanceof Error ? caught.message : caught);
+    void alertOwner(
+      "webhook",
+      `A paid order could not be recorded: ${caught instanceof Error ? caught.message : String(caught)}`,
+      { paymentIntent: intent.id },
+    );
     return Response.json({ error: "Order could not be recorded." }, { status: 500 });
   }
 }
@@ -284,17 +326,20 @@ export async function POST(request: Request) {
   // Wholesale pays through a PaymentIntent created by /api/buyer/payment-intent,
   // so the card form can live on our own site and inside the app. Retail still
   // uses Checkout Sessions. Both land here.
-  if (event.type === "payment_intent.succeeded") {
+  // What kind of event this is, and whether it is ours to act on. Stripe
+  // delivers at least once and retries for days, so this decision — and the
+  // dedupe key it hands back — is what keeps a duplicate from becoming a
+  // second box on the bench.
+  const plan = planForEvent(event as { type?: string; data?: { object?: Record<string, never> } });
+  if (plan.kind === "acknowledge") {
+    log("info", "webhook.acknowledged", { type: event.type || "", why: plan.why });
+    return Response.json({ received: true });
+  }
+  if (plan.kind === "record-intent") {
     return recordFromPaymentIntent((event.data?.object || {}) as StripePaymentIntentEvent);
   }
 
-  // Every other event type is acknowledged so Stripe stops retrying it.
-  if (event.type !== "checkout.session.completed") {
-    return Response.json({ received: true });
-  }
-
   const session = (event.data?.object || {}) as StripeSession;
-  if (!session.id) return Response.json({ received: true });
 
   // Wholesale sessions do not collect an address at checkout — delivery is
   // locked to the approved storefront, which travels as metadata.
@@ -312,7 +357,9 @@ export async function POST(request: Request) {
   try {
     const input: NewOrderInput = {
       channel,
-      stripeSessionId: session.id,
+      // The tested dedupe key, not session.id read a second time: one place
+      // decides what makes a delivery a duplicate.
+      stripeSessionId: plan.dedupeKey,
       stripePaymentIntentId: String(session.payment_intent || ""),
       customerName: String(
         session.shipping_details?.name || meta.businessName || session.customer_details?.name || "",
@@ -331,6 +378,7 @@ export async function POST(request: Request) {
       totalCents: Number(session.amount_total || 0),
     };
     const result = await recordOrder(input);
+    noteLateDelivery(result, plan.dedupeKey);
     await announceOrder(input, result, Number(session.metadata?.caseCount || 0));
     return Response.json({ received: true, created: result.created });
   } catch (caught) {

@@ -42,3 +42,7 @@ next-env.d.ts
 /outputs/
 /work/
 .dev.vars
+
+# Database backups. Real customer data — never commit them, and keep them
+# somewhere that is not this machine.
+/backups/

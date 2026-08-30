@@ -9,11 +9,13 @@ import type { BuyerOrder } from "../types";
 type Props = {
   onBack: () => void;
   onReorder: () => void;
+  /** Opens the "tell us what went wrong" screen for this order. */
+  onReportProblem: () => void;
   order: BuyerOrder;
 };
 
 /** One order in full: where it is, what is in it, and where it is going. */
-export function OrderDetailScreen({ onBack, onReorder, order }: Props) {
+export function OrderDetailScreen({ onBack, onReorder, onReportProblem, order }: Props) {
   const currency = order.total.currencyCode;
   return (
     <SafeAreaView style={styles.safe}>
@@ -29,6 +31,29 @@ export function OrderDetailScreen({ onBack, onReorder, order }: Props) {
           Placed {formatDate(order.processedAt)}
           {order.shippedAt ? ` · Shipped ${formatDate(order.shippedAt)}` : ""}
         </Text>
+
+        {order.holdReason ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeKicker}>ON HOLD</Text>
+            <Text style={styles.noticeText}>{order.holdReason}</Text>
+          </View>
+        ) : null}
+        {order.cancelRequested ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeKicker}>CANCELLATION ASKED FOR</Text>
+            <Text style={styles.noticeText}>
+              We&apos;ve got your request and we&apos;ll confirm today.
+            </Text>
+          </View>
+        ) : null}
+        {order.refunded && Number(order.refunded) > 0 ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeKicker}>REFUNDED</Text>
+            <Text style={styles.noticeText}>
+              {formatMoney(order.refunded, currency)} has been sent back to you.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.trackerCard}>
           <OrderTracker order={order} />
@@ -88,11 +113,23 @@ export function OrderDetailScreen({ onBack, onReorder, order }: Props) {
           <Text style={styles.reorderArrow}>→</Text>
         </Pressable>
 
+        <Pressable
+          accessibilityHint={`Tell the bakery about a problem with order ${order.name}`}
+          accessibilityRole="button"
+          onPress={onReportProblem}
+          style={({ pressed }) => [styles.problem, pressed && styles.pressed]}
+        >
+          <Text style={styles.problemText}>
+            {order.canRequestCancellation ? "NEED TO CANCEL, OR SOMETHING WRONG?" : "SOMETHING WRONG WITH THIS ORDER?"}
+          </Text>
+          <Text style={styles.problemArrow}>→</Text>
+        </Pressable>
+
         <Text
           onPress={() => void Linking.openURL(`mailto:sales@dallasbakery.com?subject=Order%20${encodeURIComponent(order.name)}`)}
           style={styles.help}
         >
-          Question about {order.name}? sales@dallasbakery.com
+          Or write to us: sales@dallasbakery.com
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -131,5 +168,11 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   reorderText: { color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 9, letterSpacing: 1.2 },
   reorderArrow: { color: colors.chocolate, fontFamily: fonts.sansMedium, fontSize: 18 },
-  help: { marginTop: 24, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, textAlign: "center", textDecorationLine: "underline" },
+  notice: { marginTop: 16, padding: 14, borderLeftWidth: 3, borderLeftColor: colors.gold, backgroundColor: colors.paper },
+  noticeKicker: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 8.8, letterSpacing: 1 },
+  noticeText: { marginTop: 6, color: colors.chocolate, fontFamily: fonts.sans, fontSize: 11, lineHeight: 17 },
+  problem: { marginTop: 12, minHeight: 54, paddingHorizontal: 17, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
+  problemText: { flex: 1, color: colors.muted, fontFamily: fonts.sansMedium, fontSize: 9, letterSpacing: 1.2 },
+  problemArrow: { color: colors.rust, fontFamily: fonts.sansMedium, fontSize: 18 },
+  help: { marginTop: 20, color: colors.muted, fontFamily: fonts.sans, fontSize: 10, textAlign: "center", textDecorationLine: "underline" },
 });

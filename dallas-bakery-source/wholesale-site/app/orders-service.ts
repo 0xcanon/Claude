@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { getDb } from "../db";
 import { orders } from "../db/schema";
+import { alertOwner } from "./observability.ts";
 import { bakeryDayStartIso } from "./order-rules.ts";
 import { packagesForOrder, type PackableItem } from "./parcel-packing.ts";
 import { listAllProducts } from "./wholesale-catalog.ts";
@@ -63,11 +64,21 @@ function todayStartIso() {
 export async function recordOrder(input: NewOrderInput) {
   const db = getDb();
   const [existing] = await db
-    .select({ id: orders.id, orderNumber: orders.orderNumber })
+    // The status comes back too: a retry arriving after the owner has already
+    // cancelled or refunded the order is still a no-op, but it is worth
+    // saying out loud rather than swallowing.
+    .select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status })
     .from(orders)
     .where(eq(orders.stripeSessionId, input.stripeSessionId))
     .limit(1);
-  if (existing) return { created: false, id: existing.id, orderNumber: existing.orderNumber };
+  if (existing) {
+    return {
+      created: false,
+      id: existing.id,
+      orderNumber: existing.orderNumber,
+      existingStatus: existing.status,
+    };
+  }
 
   // Wholesale ships one box per case, so the case count is the box count.
   // Retail has no cases and still divides loaves into boxes.
@@ -109,7 +120,7 @@ export async function recordOrder(input: NewOrderInput) {
     requestedDeliveryDate: input.requestedDeliveryDate || null,
     status: "paid",
   });
-  return { created: true, id, orderNumber: nextNumber };
+  return { created: true, id, orderNumber: nextNumber, existingStatus: "" };
 }
 
 export type OrderRow = typeof orders.$inferSelect;
@@ -227,6 +238,11 @@ export async function createLabelsForOrders(ids: string[]) {
         .update(orders)
         .set({ labelError: result.error, updatedAt: sql`CURRENT_TIMESTAMP` })
         .where(eq(orders.id, order.id));
+      void alertOwner("ups-label", `Order #${order.orderNumber}: ${result.error}`, {
+        orderNumber: order.orderNumber,
+        city: order.city,
+        state: order.state,
+      });
       outcomes.push({
         id: order.id,
         orderNumber: order.orderNumber,

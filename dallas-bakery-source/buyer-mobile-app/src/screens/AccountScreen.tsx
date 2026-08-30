@@ -27,6 +27,8 @@ type Props = {
   onOpenInvoice: (orderId: string) => void;
   onOpenStatement: () => void;
   onOpenSupport: () => void;
+  /** Opens the screen for telling the bakery something went wrong. */
+  onReportProblem: () => void;
   onOpenLegal: (document: "privacy" | "terms") => void;
   onOpenNotifications: () => void;
   onOpenAbout: () => void;
@@ -51,6 +53,7 @@ export function AccountScreen({
   onOpenInvoice,
   onOpenStatement,
   onOpenSupport,
+  onReportProblem,
   onOpenLegal,
   onOpenNotifications,
   onOpenAbout,
@@ -99,6 +102,7 @@ export function AccountScreen({
 
         <Text style={styles.menuKicker}>HELP &amp; LEGAL</Text>
         <View style={styles.menu}>
+          <MenuItem label="Report a problem" onPress={onReportProblem} />
           <MenuItem label="Help & contact" onPress={onOpenSupport} />
           <MenuItem label="Wholesale terms" onPress={() => onOpenLegal("terms")} />
           <MenuItem label="Privacy notice" onPress={() => onOpenLegal("privacy")} />

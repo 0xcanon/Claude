@@ -12,7 +12,13 @@ import { desc, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { orders } from "../../../../db/schema";
 import { BuyerAuthError, requireBuyer } from "../../../buyer-auth.ts";
-import { buyerStage, isTrackable, trackingUrl } from "../../../order-status.ts";
+import { buyerEventsForOrder, readableActor } from "../../../order-events.ts";
+import {
+  buyerStage,
+  canRequestCancellation,
+  isTrackable,
+  trackingUrl,
+} from "../../../order-status.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +27,39 @@ type StoredItem = { sku?: string; name?: string; quantity?: number; unitAmountCe
 export async function GET(request: Request) {
   try {
     const buyer = await requireBuyer(request);
+
+    // ?id=… asks for one order's story instead of the list: what happened,
+    // when, and who did it. Only buyer-visible lines — the bakery's own
+    // notes on an order stay with the bakery.
+    const wantedId = new URL(request.url).searchParams.get("id") || "";
+    if (wantedId) {
+      const [one] = await getDb()
+        .select()
+        .from(orders)
+        .where(eq(orders.id, wantedId))
+        .limit(1);
+      if (!one || one.email !== buyer.email) {
+        return Response.json({ error: "That order isn't on your account." }, { status: 404 });
+      }
+      const events = await buyerEventsForOrder(one.id);
+      return Response.json({
+        id: one.id,
+        orderNumber: one.orderNumber,
+        stage: buyerStage(one.status).key,
+        holdReason: one.holdReason,
+        cancelRequested: Boolean(one.cancelRequestedAt),
+        canRequestCancellation: canRequestCancellation(one.status, one.cancelRequestedAt),
+        refunded: (one.refundedCents / 100).toFixed(2),
+        timeline: events.map((event) => ({
+          id: event.id,
+          kind: event.kind,
+          summary: event.summary,
+          who: readableActor(event.actor),
+          at: event.createdAt,
+        })),
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const rows = await getDb()
       .select()
       .from(orders)
@@ -78,6 +117,14 @@ export async function GET(request: Request) {
             state: order.state,
             zip: order.zip,
           },
+
+          // What the buyer is allowed to ask for on this order. Decided
+          // here rather than in the app, so the website and the app can
+          // never disagree about whether it is too late to cancel.
+          canRequestCancellation: canRequestCancellation(order.status, order.cancelRequestedAt),
+          cancelRequested: Boolean(order.cancelRequestedAt),
+          holdReason: order.holdReason,
+          refunded: (order.refundedCents / 100).toFixed(2),
 
           // Kept for older app builds that read these names.
           fulfillmentStatus: order.status === "shipped" ? "FULFILLED" : "UNFULFILLED",

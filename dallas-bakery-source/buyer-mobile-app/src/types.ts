@@ -115,6 +115,18 @@ export type BuyerOrder = {
   /** The delivery day the buyer asked for (YYYY-MM-DD), when they picked one. */
   requestedDeliveryDate?: string;
 
+  /**
+   * Whether this order can still be cancelled, decided by the server. The app
+   * never works it out from the stage: the bakery is the only one that knows
+   * whether the bread is already in a box.
+   */
+  canRequestCancellation?: boolean;
+  cancelRequested?: boolean;
+  /** Why the order is paused, when it is. Written for the buyer to read. */
+  holdReason?: string;
+  /** Dollars already sent back on this order, as a string like "42.00". */
+  refunded?: string;
+
   deliverTo: {
     name: string;
     street: string;
@@ -237,4 +249,49 @@ export type ClosurePreview = {
 export type NotificationPreferences = {
   orderUpdates: boolean;
   invoiceReminders: boolean;
+};
+
+/* ------------------------------------------------------- problems raised -- */
+
+export type SupportReasonOption = {
+  key: string;
+  label: string;
+  /** The prompt under the box, so the first message is actually useful. */
+  prompt: string;
+  likelyRefund: boolean;
+  /** True when the reason only makes sense against a specific order. */
+  needsOrder: boolean;
+};
+
+export type BuyerSupportCase = {
+  id: string;
+  reason: string;
+  reasonLabel: string;
+  message: string;
+  status: "open" | "answered" | "resolved";
+  /** The bakery's answer, once there is one. */
+  reply: string;
+  orderNumber: number;
+  openedAt: string;
+  /** "3 hours", "2 days" — how long it has been waiting. */
+  waitingFor: string;
+};
+
+export type OrderTimelineEntry = {
+  id: string;
+  kind: string;
+  summary: string;
+  who: string;
+  at: string;
+};
+
+export type OrderTimeline = {
+  id: string;
+  orderNumber: number;
+  stage: string;
+  holdReason: string;
+  cancelRequested: boolean;
+  canRequestCancellation: boolean;
+  refunded: string;
+  timeline: OrderTimelineEntry[];
 };

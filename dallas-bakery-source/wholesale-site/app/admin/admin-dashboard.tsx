@@ -5,6 +5,7 @@ import { DeliveryLocations } from "./delivery-locations";
 import { MarketingPanel } from "./marketing-panel";
 import { ProductsManager } from "./products-manager";
 import { ShippingQueue } from "./shipping-queue";
+import { SupportQueue } from "./support-queue";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -361,6 +362,8 @@ export default function AdminDashboard({ initialApplications, initialOutstanding
         <ProductsManager />
 
         <ShippingQueue />
+
+        <SupportQueue />
 
         <MarketingPanel />
 

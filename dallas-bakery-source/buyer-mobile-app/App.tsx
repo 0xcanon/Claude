@@ -64,6 +64,7 @@ import { OrderSuccessScreen } from "./src/screens/OrderSuccessScreen";
 import { OrdersScreen } from "./src/screens/OrdersScreen";
 import { PaymentScreen } from "./src/screens/PaymentScreen";
 import { ProductDetailScreen } from "./src/screens/ProductDetailScreen";
+import { ReportProblemScreen } from "./src/screens/ReportProblemScreen";
 import { SignInScreen } from "./src/screens/SignInScreen";
 import { SupportScreen } from "./src/screens/SupportScreen";
 import { WelcomeScreen } from "./src/screens/WelcomeScreen";
@@ -89,7 +90,10 @@ type Screen =
   // Pages a customer — or an App Review reviewer — can open with or without
   // an account: help, the legal documents, notification settings, and the
   // account-closure flow Apple requires to live inside the app.
-  | "support" | "legal" | "about" | "notifications" | "close-account" | "closed";
+  | "support" | "legal" | "about" | "notifications" | "close-account" | "closed"
+  // Telling the bakery something went wrong, and reading what they said
+  // back. Opened from one order, or from Account for anything else.
+  | "problem";
 
 // How long the confirmation screen waits for Stripe's webhook to record the
 // order before it stops polling. The payment is captured either way.
@@ -830,6 +834,24 @@ export default function App() {
     );
   }
 
+  if (screen === "problem" && session) {
+    const problemOrder = account?.orders.find((entry) => entry.id === openOrderId);
+    return (
+      <>
+        <StatusBar style="dark" />
+        <ReportProblemScreen
+          onBack={() => setScreen(returnScreen)}
+          order={problemOrder ? {
+            id: problemOrder.id,
+            name: problemOrder.name,
+            canRequestCancellation: Boolean(problemOrder.canRequestCancellation),
+            cancelRequested: Boolean(problemOrder.cancelRequested),
+          } : undefined}
+          session={session}
+        />
+      </>
+    );
+  }
   if (screen === "support") {
     return (
       <>
@@ -1064,6 +1086,7 @@ export default function App() {
           <OrderDetailScreen
             onBack={() => setScreen("orders")}
             onReorder={() => reorder(openOrder)}
+            onReportProblem={() => openPage("problem")}
             order={openOrder}
           />
         </>
@@ -1116,6 +1139,7 @@ export default function App() {
           onOpenInvoice={(orderId) => void openDocument("invoice", orderId)}
           onOpenStatement={() => void openDocument("statement")}
           onOpenSupport={() => openPage("support")}
+          onReportProblem={() => { setOpenOrderId(""); openPage("problem"); }}
           onOpenLegal={(document) => openPage("legal", document)}
           onOpenNotifications={() => { void loadNotificationPreferences(); openPage("notifications"); }}
           onOpenAbout={() => openPage("about")}

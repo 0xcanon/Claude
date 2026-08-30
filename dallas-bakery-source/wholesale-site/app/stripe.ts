@@ -204,13 +204,23 @@ export function listCardPaymentMethods(customerId: string) {
 export type StripeRefund = { id: string; status?: string; amount?: number };
 
 /**
- * Full refund of a payment. Idempotent on the payment-intent id, so clicking
- * Refund twice can never refund twice.
+ * Refunds a payment — all of it, or part of it for a short or damaged
+ * shipment.
+ *
+ * The idempotency key includes the amount, so pressing Refund twice on the
+ * same amount can never refund twice, while a later, different partial refund
+ * on the same order still goes through. Keying on the payment intent alone
+ * would silently swallow the second one.
  */
-export function createRefund(paymentIntentId: string) {
+export function createRefund(paymentIntentId: string, amountCents?: number) {
+  const partial = Number.isInteger(amountCents) && (amountCents as number) > 0;
   return call<StripeRefund>("/refunds", {
     method: "POST",
-    body: { payment_intent: paymentIntentId },
-    idempotencyKey: `refund-${paymentIntentId}`,
+    body: {
+      payment_intent: paymentIntentId,
+      // Omitted means "everything", which is what Stripe does by default.
+      ...(partial ? { amount: amountCents } : {}),
+    },
+    idempotencyKey: `refund-${paymentIntentId}-${partial ? amountCents : "full"}`,
   });
 }
