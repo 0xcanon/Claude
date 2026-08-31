@@ -1,7 +1,14 @@
 import type {
   ApplicationStatus,
+  LabelOutcome,
   MobileSession,
+  OrderEvent,
+  OrderStatus,
+  OwnerOrder,
+  OwnerProduct,
+  OwnerSummary,
   ShippingSettings,
+  SupportCase,
   WholesaleApplication,
 } from "../types";
 
@@ -158,4 +165,102 @@ export async function unregisterPushToken(deviceToken: string) {
     // A phone that cannot reach the server on sign-out keeps its row until
     // the next sign-in replaces it.
   }
+}
+
+/* -------------------------------------------------- running the bakery -- */
+
+export async function getOwnerSummary(token: string) {
+  return request<OwnerSummary>("/api/mobile/admin/summary", { token });
+}
+
+export async function getOrders(token: string, scope: "unshipped" | "today" | "all") {
+  const result = await request<{ orders: OwnerOrder[] }>(
+    `/api/mobile/admin/orders?scope=${scope}`,
+    { token },
+  );
+  return result.orders;
+}
+
+/** Buys UPS labels. Failures come back per order, not as one thrown error. */
+export async function createLabels(token: string, ids: string[]) {
+  const result = await request<{ results: LabelOutcome[]; message?: string }>(
+    "/api/mobile/admin/orders",
+    { method: "POST", token, body: { action: "create-labels", ids } },
+  );
+  return result;
+}
+
+export async function markShipped(token: string, ids: string[]) {
+  const result = await request<{ shipped: number }>("/api/mobile/admin/orders", {
+    method: "POST",
+    token,
+    body: { action: "mark-shipped", ids },
+  });
+  return result.shipped;
+}
+
+export async function markInvoicePaid(token: string, id: string) {
+  return request<{ invoicePaid: boolean; orderNumber: number }>("/api/mobile/admin/orders", {
+    method: "POST",
+    token,
+    body: { action: "mark-invoice-paid", ids: [id] },
+  });
+}
+
+export async function getOrderHistory(token: string, id: string) {
+  return request<{ reasons: string[]; events: OrderEvent[] }>(
+    `/api/mobile/admin/order-actions?id=${encodeURIComponent(id)}`,
+    { token },
+  );
+}
+
+/**
+ * One order, one change. The server decides what is legal, so the app can
+ * offer a button and let the refusal come back as a sentence to show.
+ */
+export async function orderAction(
+  token: string,
+  body: {
+    action: "hold" | "release" | "correct" | "cancel" | "refund" | "mark-delivered";
+    id: string;
+    reason?: string;
+    amountCents?: number;
+    correction?: Record<string, string>;
+  },
+) {
+  return request<{ ok: true; order: { id: string; orderNumber: number; status: OrderStatus; refundedCents: number } }>(
+    "/api/mobile/admin/order-actions",
+    { method: "POST", token, body },
+  );
+}
+
+export async function getSupportCases(token: string) {
+  return request<{ cases: SupportCase[]; openCount: number }>("/api/mobile/admin/support", { token });
+}
+
+export async function respondToCase(
+  token: string,
+  body: { id: string; reply?: string; ownerNotes?: string; status?: "open" | "answered" | "resolved" },
+) {
+  return request<{ ok: true; case: { id: string; status: string } }>("/api/mobile/admin/support", {
+    method: "POST",
+    token,
+    body,
+  });
+}
+
+export async function getOwnerProducts(token: string) {
+  const result = await request<{ products: OwnerProduct[] }>("/api/mobile/admin/products", { token });
+  return result.products;
+}
+
+export async function updateProductStock(
+  token: string,
+  body: { sku: string; inStock?: boolean; dailyCapacityCases?: number },
+) {
+  return request<{ ok: true; product: OwnerProduct }>("/api/mobile/admin/products", {
+    method: "PATCH",
+    token,
+    body,
+  });
 }

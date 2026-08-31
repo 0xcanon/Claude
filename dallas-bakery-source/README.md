@@ -19,8 +19,10 @@ source audit, including what is honestly still open.
   track approval, sign in, order against your own prices, pay by card or on
   account, follow an order, download invoices, report a problem, manage
   notifications, and close the account.
-- **`owner-mobile-app/`** — the separate owner app: review applications,
-  approve or decline, add notes, and change the live shipping settings.
+- **`owner-mobile-app/`** — the separate owner app, and now a full operations
+  app: the day's bake sheet and numbers, the shipping queue with labels and
+  the whole order lifecycle, the problem queue, stock control, and the
+  application approvals it always had.
 
 Customer and owner sign-in are deliberately separate systems. No
 backend-platform branding appears on any customer-facing screen.
@@ -69,7 +71,7 @@ cd buyer-mobile-app && npm ci && npm run typecheck && npm test
 cd owner-mobile-app && npm ci && npm run typecheck && npm test
 ```
 
-At the last packaging of this source: **183 wholesale-site tests passing**,
+At the last packaging of this source: **192 wholesale-site tests passing**,
 lint and strict TypeScript clean across all three projects, and 17 database
 migrations applying cleanly to an empty database.
 

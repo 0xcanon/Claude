@@ -4,7 +4,7 @@ Use this checklist before opening the website or submitting either app to an app
 
 ## 0. Re-verify the source
 
-- [ ] Run `npm ci && npm run verify` in `wholesale-site/` (lint, strict TypeScript, production build, and the full unit-test suite — 183 tests at the last packaging; the number only ever goes up, so treat a smaller count as a problem).
+- [ ] Run `npm ci && npm run verify` in `wholesale-site/` (lint, strict TypeScript, production build, and the full unit-test suite — 192 tests at the last packaging; the number only ever goes up, so treat a smaller count as a problem).
 - [ ] Run `npm ci && npm run typecheck && npm test` in `buyer-mobile-app/` and `owner-mobile-app/`.
 
 ## 1. Wholesale website
@@ -62,6 +62,7 @@ Products, buyer accounts, pricing and checkout all live in this system's own
 
 - [ ] Set `EXPO_PUBLIC_API_URL=https://dallasbakery.net` in the signed-build environment.
 - [ ] Test owner login, required first password change, logout, and session expiry.
+- [ ] Walk the five owner tabs on a real phone: Today's numbers and bake sheet, the shipping queue (buy a label, mark shipped), one order through hold → release → cancel with its history, answering a problem, and taking a bread off sale. Everything the owner app writes is signed with the admin email and appears in the same audit trail as the web portal.
 - [ ] Test pending/approved/declined queues, application details, owner notes, account-setup retry, and multiple-location display.
 - [ ] Change the shipping rate in the owner app and confirm the website and buyer app immediately show the new value.
 
